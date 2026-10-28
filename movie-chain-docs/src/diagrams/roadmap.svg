@@ -1,0 +1,34 @@
+<svg viewBox="0 0 720 280" role="img">
+<text class="s-cap" x="0" y="11">Delivery in five increments — each one ends with something demonstrable</text>
+<g class="s-xs" fill="var(--faint)">
+<text x="150" y="30">Weeks 1–4</text><text x="262" y="30">5–9</text><text x="352" y="30">10–14</text><text x="452" y="30">15–19</text><text x="572" y="30">20–24</text>
+</g>
+<path class="ln-f" d="M140 34 L720 34"/>
+<g>
+<rect class="b-am" x="0" y="42" width="136" height="38" rx="4"/><text class="s-lb" x="8" y="58">P0 · Foundation</text><text class="s-xs" x="8" y="72">tenancy from day one</text>
+<rect x="140" y="46" width="130" height="30" rx="4" fill="var(--amber)"/>
+<text class="s-lbw" x="148" y="58">Tenant model · RLS</text><text class="s-xs" x="148" y="70" fill="#fff">auth · onboarding · CI</text>
+</g>
+<g>
+<rect class="b-bl" x="0" y="88" width="136" height="38" rx="4"/><text class="s-lb" x="8" y="104">P1 · Catalogue</text><text class="s-xs" x="8" y="118">something to sell</text>
+<rect x="250" y="92" width="120" height="30" rx="4" fill="var(--blue)"/>
+<text class="s-lbw" x="258" y="104">Theatres · screens</text><text class="s-xs" x="258" y="116" fill="#fff">seats · films · showings</text>
+</g>
+<g>
+<rect class="b-gr" x="0" y="134" width="136" height="38" rx="4"/><text class="s-lb" x="8" y="150">P2 · Booking core</text><text class="s-xs" x="8" y="164">the hard part</text>
+<rect x="340" y="138" width="140" height="30" rx="4" fill="var(--green)"/>
+<text class="s-lbw" x="348" y="150">Seat holds · payment</text><text class="s-xs" x="348" y="162" fill="#fff">tickets · refunds</text>
+</g>
+<g>
+<rect class="b-pu" x="0" y="180" width="136" height="38" rx="4"/><text class="s-lb" x="8" y="196">P3 · Operations</text><text class="s-xs" x="8" y="210">running it for real</text>
+<rect x="450" y="184" width="130" height="30" rx="4" fill="var(--purple)"/>
+<text class="s-lbw" x="458" y="196">Tenant dashboards</text><text class="s-xs" x="458" y="208" fill="#fff">metering · cost per tenant</text>
+</g>
+<g>
+<rect class="b-w" x="0" y="226" width="136" height="38" rx="4"/><text class="s-lb" x="8" y="242">P4 · Tiering</text><text class="s-xs" x="8" y="256">monetise the architecture</text>
+<rect x="560" y="230" width="150" height="30" rx="4" fill="var(--navy)"/>
+<text class="s-lbw" x="568" y="242">Silo for Premium</text><text class="s-xs" x="568" y="254" fill="#fff">throttles · tier migration</text>
+</g>
+<rect class="b-rd" x="150" y="264" width="570" height="14" rx="3"/>
+<text class="s-xs" x="158" y="274">Sequencing rule: tenancy is in P0. Retrofitting tenant_id onto a live schema is the most expensive mistake available.</text>
+</svg>

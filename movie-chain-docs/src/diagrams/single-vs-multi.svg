@@ -1,0 +1,52 @@
+<svg viewBox="0 0 720 300" role="img">
+<text class="s-cap" x="0" y="11">The old way — one install per customer</text>
+<rect class="b-dash" x="0" y="22" width="330" height="248" rx="6"/>
+<g>
+<rect class="b-w" x="14" y="38" width="94" height="92" rx="5"/><text class="s-hd mid-a" x="61" y="56">Nyati Ltd</text>
+<rect class="b-n" x="24" y="64" width="74" height="17" rx="3"/><text class="s-lbw mid-a" x="61" y="76">App v3.1</text>
+<rect class="b-bl" x="24" y="85" width="74" height="17" rx="3"/><text class="s-sm mid-a" x="61" y="97">Database</text>
+<rect class="b-am" x="24" y="106" width="74" height="17" rx="3"/><text class="s-sm mid-a" x="61" y="118">Server</text>
+</g>
+<g>
+<rect class="b-w" x="118" y="38" width="94" height="92" rx="5"/><text class="s-hd mid-a" x="165" y="56">Prestige</text>
+<rect class="b-n" x="128" y="64" width="74" height="17" rx="3"/><text class="s-lbw mid-a" x="165" y="76">App v2.8</text>
+<rect class="b-bl" x="128" y="85" width="74" height="17" rx="3"/><text class="s-sm mid-a" x="165" y="97">Database</text>
+<rect class="b-am" x="128" y="106" width="74" height="17" rx="3"/><text class="s-sm mid-a" x="165" y="118">Server</text>
+</g>
+<g>
+<rect class="b-w" x="222" y="38" width="94" height="92" rx="5"/><text class="s-hd mid-a" x="269" y="56">Sarit Films</text>
+<rect class="b-n" x="232" y="64" width="74" height="17" rx="3"/><text class="s-lbw mid-a" x="269" y="76">App v3.0</text>
+<rect class="b-bl" x="232" y="85" width="74" height="17" rx="3"/><text class="s-sm mid-a" x="269" y="97">Database</text>
+<rect class="b-am" x="232" y="106" width="74" height="17" rx="3"/><text class="s-sm mid-a" x="269" y="118">Server</text>
+</g>
+<text class="s-lb" x="14" y="152">What this costs you</text>
+<text class="s-sm" x="14" y="168">✗  Three versions live at once — every fix ported 3×</text>
+<text class="s-sm" x="14" y="183">✗  Three servers idling at 8% CPU each</text>
+<text class="s-sm" x="14" y="198">✗  A release is a project, not a Tuesday</text>
+<text class="s-sm" x="14" y="213">✗  Onboarding customer #4 = procurement + install</text>
+<text class="s-sm" x="14" y="228">✗  Cost grows in a straight line with customers</text>
+<rect class="b-rd" x="14" y="240" width="302" height="20" rx="4"/>
+<text class="s-lb" x="24" y="254">Margin shrinks as you grow. This is not SaaS.</text>
+
+<text class="s-cap" x="390" y="11">The SaaS way — one system, many tenants</text>
+<rect class="b-dasha" x="390" y="22" width="330" height="248" rx="6"/>
+<rect class="b-n" x="404" y="38" width="302" height="30" rx="5"/>
+<text class="s-hdw mid-a" x="555" y="57">ONE running system · ONE version</text>
+<g>
+<rect class="b-am" x="404" y="76" width="94" height="40" rx="5"/>
+<text class="s-hd mid-a" x="451" y="92">Nyati Ltd</text><text class="s-xs mid-a" x="451" y="106">tenant_a1f3</text>
+<rect class="b-am" x="508" y="76" width="94" height="40" rx="5"/>
+<text class="s-hd mid-a" x="555" y="92">Prestige</text><text class="s-xs mid-a" x="555" y="106">tenant_b7c2</text>
+<rect class="b-am" x="612" y="76" width="94" height="40" rx="5"/>
+<text class="s-hd mid-a" x="659" y="92">Sarit Films</text><text class="s-xs mid-a" x="659" y="106">tenant_c9e5</text>
+</g>
+<text class="s-capm" x="404" y="134">Tenants are data + configuration, not deployments</text>
+<rect class="b-bl" x="404" y="142" width="302" height="26" rx="4"/>
+<text class="s-lb mid-a" x="555" y="159">Shared database · rows tagged with tenant_id</text>
+<text class="s-lb" x="404" y="192">What this buys you</text>
+<text class="s-sm" x="404" y="208">✓  Fix once, every tenant has it by lunchtime</text>
+<text class="s-sm" x="404" y="223">✓  Tenant #4 is a database row, created in seconds</text>
+<text class="s-sm" x="404" y="238">✓  One bill, hardware shared across the peaks</text>
+<rect class="b-gr" x="404" y="246" width="302" height="20" rx="4"/>
+<text class="s-lb" x="414" y="260">Margin improves as you grow. This is SaaS.</text>
+</svg>

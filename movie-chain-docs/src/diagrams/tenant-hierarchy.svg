@@ -1,0 +1,38 @@
+<svg viewBox="0 0 720 320" role="img">
+<rect class="b-n" x="250" y="14" width="220" height="34" rx="5"/>
+<text class="s-lbw mid-a" x="360" y="28">CINECHAIN — the platform</text>
+<text class="s-smw mid-a" x="360" y="42">one system, one codebase, one deployment</text>
+<path class="ln-a" d="M360 48 L360 62 M150 62 L570 62 M150 62 L150 74 M360 62 L360 74 M570 62 L570 74" marker-end="url(#ah-a)"/>
+<text class="s-cap" x="0" y="72">TENANT · a cinema chain — the unit of billing, isolation and administration</text>
+<rect class="b-am" x="60" y="78" width="180" height="34" rx="4"/><text class="s-hd mid-a" x="150" y="93">Nyati Cinemas</text><text class="s-xs mid-a" x="150" y="106">PREMIUM · 14 theatres</text>
+<rect class="b-gr" x="270" y="78" width="180" height="34" rx="4"/><text class="s-hd mid-a" x="360" y="93">Prestige Screens</text><text class="s-xs mid-a" x="360" y="106">STANDARD · 5 theatres</text>
+<rect class="b-pu" x="480" y="78" width="180" height="34" rx="4"/><text class="s-hd mid-a" x="570" y="93">Sarit Filmhouse</text><text class="s-xs mid-a" x="570" y="106">BASIC · 1 theatre</text>
+
+<path class="ln-d" d="M150 112 L150 124 M70 124 L230 124 M70 124 L70 136 M150 124 L150 136 M230 124 L230 136"/>
+<text class="s-capm" x="0" y="134">THEATRE · a physical building in a town</text>
+<rect class="b" x="20" y="140" width="100" height="30"/><text class="s-lb mid-a" x="70" y="154">Westlands</text><text class="s-xs mid-a" x="70" y="165">Nairobi · 6 rooms</text>
+<rect class="b" x="128" y="140" width="100" height="30"/><text class="s-lb mid-a" x="178" y="154">Nyali</text><text class="s-xs mid-a" x="178" y="165">Mombasa · 4 rooms</text>
+<rect class="b" x="236" y="140" width="100" height="30"/><text class="s-lb mid-a" x="286" y="154">Mega Plaza</text><text class="s-xs mid-a" x="286" y="165">Kisumu · 3 rooms</text>
+<rect class="b-w" x="344" y="140" width="330" height="30"/><text class="s-sm mid-a" x="509" y="159">…every theatre row carries tenant_id = nyati</text>
+
+<path class="ln-d" d="M70 170 L70 182 M40 182 L150 182 M40 182 L40 194 M95 182 L95 194 M150 182 L150 194"/>
+<text class="s-capm" x="0" y="192">SCREEN / ROOM · a hall inside the theatre</text>
+<rect class="b-bl" x="8" y="198" width="64" height="28"/><text class="s-xs mid-a" x="40" y="212">Screen 1</text><text class="s-xs mid-a" x="40" y="222">IMAX · 240</text>
+<rect class="b-bl" x="78" y="198" width="64" height="28"/><text class="s-xs mid-a" x="110" y="212">Screen 2</text><text class="s-xs mid-a" x="110" y="222">Std · 120</text>
+<rect class="b-bl" x="148" y="198" width="64" height="28"/><text class="s-xs mid-a" x="180" y="212">Screen 3</text><text class="s-xs mid-a" x="180" y="222">VIP · 48</text>
+
+<path class="ln-d" d="M40 226 L40 238"/>
+<text class="s-capm" x="0" y="248">SEAT · a physical chair, fixed to the room — not to a showing</text>
+<g>
+<rect class="b-w" x="8" y="254" width="200" height="40" rx="4"/>
+<g fill="var(--blue-wash)" stroke="#bcd5f5">
+<rect x="16" y="262" width="13" height="11" rx="2"/><rect x="32" y="262" width="13" height="11" rx="2"/><rect x="48" y="262" width="13" height="11" rx="2"/><rect x="64" y="262" width="13" height="11" rx="2"/><rect x="80" y="262" width="13" height="11" rx="2"/><rect x="96" y="262" width="13" height="11" rx="2"/>
+<rect x="16" y="277" width="13" height="11" rx="2"/><rect x="32" y="277" width="13" height="11" rx="2"/><rect x="48" y="277" width="13" height="11" rx="2"/><rect x="64" y="277" width="13" height="11" rx="2"/><rect x="80" y="277" width="13" height="11" rx="2"/><rect x="96" y="277" width="13" height="11" rx="2"/>
+</g>
+<text class="s-xs" x="118" y="271">Row A: A1…A12</text><text class="s-xs" x="118" y="286">Row B: B1…B12</text>
+</g>
+<rect class="b-am" x="220" y="238" width="454" height="56" rx="5"/>
+<text class="s-hd" x="232" y="256">The distinction that makes this system work</text>
+<text class="s-sm" x="232" y="272">A <b>seat</b> is furniture — it exists whether or not a film is showing. What customers actually buy is a</text>
+<text class="s-sm" x="232" y="287"><b>seat-for-a-screening</b>: seat B7, in Screen 2, for the 20:30 showing on 14 June.</text>
+</svg>

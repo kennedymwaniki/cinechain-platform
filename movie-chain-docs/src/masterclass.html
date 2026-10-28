@@ -1,0 +1,1061 @@
+{{d:defs}}
+<div class="cover">
+  <div class="cover-tag">A Complete Masterclass</div>
+  <h1>Multi-Tenant Architecture</h1>
+  <p class="sub">How one system serves a thousand customers at once — explained from first principles, for people who build software and people who fund it.</p>
+  <div class="rule"></div>
+  <div class="cover-badges">
+    <span>No prior knowledge assumed</span><span>29 diagrams</span><span>Vendor-neutral</span><span>Worked example: a cinema chain platform</span>
+  </div>
+  <div class="meta">
+    <b>Prepared for</b> Kennedy Mwangi<br>
+    <b>Companion volume</b> Product Requirements Document — CineChain Theatre Management Platform<br>
+    <b>Grounded in</b> <i>Building Multi-Tenant SaaS Architectures</i>, Tod Golding (O'Reilly, 2024)<br>
+    <b>Date</b> 22 September 2026
+  </div>
+</div>
+
+<section class="toc">
+<h2 class="cont">Contents</h2>
+<p class="lede">Read Part I alone and you will understand multi-tenancy well enough to hold your own in any strategy meeting. Keep going and you will know how to build it.</p>
+<ol>
+  <li>Why This Document Exists
+    <ul><li>Who each part is for</li><li>The example we will use throughout</li><li>How to read the diagrams</li></ul></li>
+  <li>Part I — The Idea
+    <ul><li>The problem nobody warns you about</li><li>Three buildings</li><li>What a &ldquo;tenant&rdquo; actually is</li><li>The vocabulary, defined once</li></ul></li>
+  <li>Part II — The Anatomy
+    <ul><li>The two halves of every SaaS system</li><li>Tenant context: the golden thread</li><li>Identity — and who your users actually are</li><li>Three populations, not one</li><li>Guest checkout, and one consumer across many tenants</li></ul></li>
+  <li>Part III — The Big Decisions
+    <ul><li>Silo, pool and bridge</li><li>Where tenant data lives — the three models in full</li><li>Enforcing isolation</li><li>Noisy neighbours</li><li>Blast radius</li></ul></li>
+  <li>Part IV — Running It
+    <ul><li>Onboarding and the tenant lifecycle</li><li>Tenant-aware operations</li><li>Tiering</li><li>Cost per tenant</li></ul></li>
+  <li>Part V — Judgement
+    <ul><li>The failure catalogue</li><li>Decision checklists</li><li>References &amp; the book, chapter by chapter</li><li>Further reading — 20+ free resources</li></ul></li>
+</ol>
+</section>
+
+<h2><span class="num">0</span>Why This Document Exists</h2>
+<p class="lede">Multi-tenancy is one of those topics that looks simple from a distance and turns out to have a decision hiding behind every noun. This document is designed to be read once, straight through, by someone who has never built such a system — and then kept on a desk as a reference.</p>
+
+<h3>Who each part is for</h3>
+<p>The document escalates deliberately. Nothing in Part I requires you to have written code. By Part III you will be reading SQL. That progression is intentional, and you are invited to stop wherever the altitude stops being useful to you.</p>
+
+<table class="lg">
+<caption>How to use this document depending on who you are</caption>
+<thead><tr><th style="width:26%">If you are…</th><th style="width:30%">Read</th><th>And you will be able to…</th></tr></thead>
+<tbody>
+<tr><td><b>A non-technical stakeholder</b><br>founder, PM, sponsor</td><td>Parts I and V<br><span class="s-sm">about 40 minutes</span></td><td>Understand what your engineers are trading away when they choose a model, and ask the three questions that matter about cost and risk.</td></tr>
+<tr><td><b>An engineer new to SaaS</b></td><td>All of it, in order</td><td>Design a tenant model, choose a partitioning strategy, and know which mistakes are expensive to reverse.</td></tr>
+<tr><td><b>An architect under time pressure</b></td><td>Parts III and V</td><td>Get to the decision tables and the failure catalogue without the build-up.</td></tr>
+<tr><td><b>Reviewing someone else's design</b></td><td>Part V first, then III</td><td>Use the checklists as an audit, then read back for the reasoning.</td></tr>
+</tbody></table>
+
+<div class="box note"><span class="bt">A note on the companion document</span>
+<p>This masterclass is deliberately vendor-neutral and product-neutral: everything in it applies whether you are building cinema software, a hospital system or a payroll product. Its companion PRD applies every one of these ideas to one concrete system, in two technology stacks. Read this one first.</p></div>
+
+<h3>The example we will use throughout</h3>
+<p>Abstract explanations of multi-tenancy tend to slide off the mind. So every concept here is anchored to a single running example: <b>a platform that sells cinema tickets, used by several competing cinema chains at once.</b></p>
+<p>The example is a good teacher because it contains, in miniature, nearly every hard problem in the field. There is sensitive commercial data that rivals must never see. There is a natural hierarchy — a chain owns theatres, a theatre contains screens, a screen contains seats. There is a violently uneven workload, because when a blockbuster opens, one chain can generate more traffic in ten minutes than everyone else generates in a month. And there is a genuinely hard concurrency problem at the centre of it: two people reaching for the same seat at the same instant.</p>
+
+<div class="grid3">
+<div class="card"><h5>Our platform</h5><p><b>CineChain</b> — one system, run by one team, sold as a service.</p></div>
+<div class="card on"><h5>Our tenants</h5><p><b>Nyati Cinemas</b> (14 theatres), <b>Prestige Screens</b> (5), <b>Sarit Filmhouse</b> (1). Competitors, all on the same servers.</p></div>
+<div class="card"><h5>Our users</h5><p>Moviegoers, box-office clerks, theatre managers, chain executives — and the platform's own operators.</p></div>
+</div>
+
+<h3>How to read the diagrams</h3>
+<p>The diagrams in this document use a consistent visual grammar. It is worth thirty seconds to learn it, because it carries meaning that the captions do not repeat.</p>
+<div class="grid2">
+<div class="card"><h5>Colour</h5>
+<p><span class="tag a">Amber</span> marks things that are <b>dedicated to one tenant</b>, or the control plane.<br>
+<span class="tag b">Blue</span> marks things that are <b>shared between tenants</b>.<br>
+<span class="tag g">Green</span> marks a good or safe outcome; red marks a failure or a breach.</p></div>
+<div class="card"><h5>Shape</h5>
+<p>Solid boxes are things that exist at runtime — processes, databases, tables. Dashed outlines group things conceptually without implying a boundary. Arrows show the direction data actually moves, not the direction of dependency.</p></div>
+</div>
+
+<div class="part">
+  <div class="pn">Part I</div>
+  <h2>The Idea</h2>
+  <p>No code, no jargon, no prerequisites. By the end of this part you will understand what multi-tenancy is, why it exists, and what it costs — well enough to explain it to someone else.</p>
+</div>
+
+<h2 class="cont"><span class="num">1</span>The Problem Nobody Warns You About</h2>
+<p class="lede">Every software business that sells the same product to many customers eventually collides with the same wall. Multi-tenancy is the name of the way through it.</p>
+
+<h3>How it starts</h3>
+<p>Imagine you have built genuinely good cinema ticketing software. Nyati Cinemas buys it. You install it on a server, configure it for their fourteen theatres, and they are delighted. Six months later Prestige Screens wants it too. So you do the sensible thing: you install a second copy, on a second server, configured for their five theatres.</p>
+<p>This works. It works for the third customer too. It is the way software was sold for thirty years, and there is nothing shameful about it.</p>
+
+<h3>Where it goes wrong</h3>
+<p>The trouble does not arrive as a crisis. It accumulates, quietly, in ways that are individually reasonable and collectively fatal.</p>
+
+<p>Nyati asks for a change to how refunds work. You build it and deploy it to their server. Prestige does not want that change, so their copy stays as it was. Now you have two versions. Sarit Filmhouse joins and asks for something else. Now you have three. A security flaw is found in the payment code, and fixing it is no longer one task — it is three careful, separate, individually-tested deployments, each on a server with slightly different software around it.</p>
+
+<p>Meanwhile the servers themselves are almost entirely idle. Cinema traffic is spiky: nothing happens from Monday to Thursday, then Friday evening arrives and everything happens at once. Each customer's server must be big enough for <em>their</em> Friday peak, which means each one sits at a few percent utilisation for most of the week. You are paying for three peaks that never coincide.</p>
+
+<figure>{{d:single-vs-multi}}<figcaption><b>Figure 1.1.</b> The same product sold two ways. On the left, each customer gets their own installation — simple at first, ruinous at scale. On the right, one system serves everyone, and a customer becomes data rather than infrastructure.</figcaption></figure>
+
+<div class="box key"><span class="bt">The economics in one sentence</span>
+<p>With separate installations, serving twice as many customers costs roughly twice as much and takes roughly twice as much of your team's attention. With multi-tenancy, it costs somewhat more and takes almost none. That difference is not an optimisation — it is the difference between a business that scales and one that does not.</p></div>
+
+<h3>So what is multi-tenancy?</h3>
+<p><b>Multi-tenancy is the practice of serving many separate customers from one running system, one codebase and one shared pool of infrastructure — while each customer experiences the software as though it were entirely their own.</b></p>
+<p>Both halves of that sentence matter, and the second half is the hard one. Sharing infrastructure is easy. Sharing it while guaranteeing that Nyati can never see, affect, or even infer the existence of Prestige's data — that is the engineering discipline this document is about.</p>
+
+<div class="box analogy"><span class="bt">The banking analogy</span>
+<p>Your bank does not keep your money in a box with your name on it. Your balance is a row in a ledger shared with millions of other customers. You are entirely comfortable with this — not because the money is physically separated, but because the bank's controls make it impossible for another customer to touch your row. Multi-tenancy asks you to make the same trade, and to earn the same confidence.</p></div>
+
+<h3>What you are giving up</h3>
+<p>Honest treatment of any architecture starts with its costs. Multi-tenancy has three real ones.</p>
+<dl>
+<dt>Correctness becomes security</dt>
+<dd>In a single-tenant system, a forgotten filter in a database query is a bug — it shows the wrong data to the right person. In a multi-tenant system, the identical mistake shows one customer's data to another. The same class of error has been promoted from embarrassing to existential.</dd>
+<dt>Failures become shared</dt>
+<dd>When the shared system goes down, everyone goes down together. You have traded many small, independent outages for fewer but much larger ones.</dd>
+<dt>Neighbours become visible</dt>
+<dd>One customer's traffic spike is now felt by everyone else. This is a genuinely new failure mode, and it has a name — the <b>noisy neighbour</b> — which we will spend a section on.</dd>
+</dl>
+<p>None of these are reasons to avoid multi-tenancy. They are the things you must design for deliberately, because none of them solve themselves.</p>
+
+<h2><span class="num">2</span>Three Buildings</h2>
+<p class="lede">If you remember one image from this entire document, make it this one. Every architectural decision in multi-tenancy is a variation on a question about housing.</p>
+
+<figure>{{d:apartment-analogy}}<figcaption><b>Figure 2.1.</b> Three ways to house many households — and three ways to host many customers. The trade-offs are identical, and the vocabulary maps one-to-one.</figcaption></figure>
+
+<h3>Detached houses</h3>
+<p>Each household has its own building: own walls, own roof, own plumbing, own water heater. Nobody can hear the neighbours, because there are no shared walls. If one house floods, nobody else gets wet.</p>
+<p>It is also the most expensive way to house people. Every roof must be maintained separately. Every boiler is a separate boiler. And if you want to repaint every front door, you must visit every house.</p>
+<p>In software this is called <b>full-stack silo</b>: every customer gets their own complete copy of everything. It is what you had before multi-tenancy, and it is still the right answer for a small number of customers with extraordinary requirements.</p>
+
+<h3>One apartment block</h3>
+<p>Now everyone lives in one building. There is one roof, one water supply, one lift, one caretaker. The cost per household collapses, and a repair to the roof benefits everyone at once.</p>
+<p>What keeps households apart is no longer distance — it is <b>locks</b>. Flat 3 cannot enter Flat 4 because the door is locked, not because they are in different buildings. That is a meaningfully different kind of guarantee, and it puts weight on the quality of the locks that was previously carried by bricks.</p>
+<p>In software this is <b>pooled</b>: shared infrastructure, shared database, with logical boundaries enforced by software. It is dramatically cheaper and it is where most customers should live.</p>
+
+<div class="box key"><span class="bt">Sit with this for a moment</span>
+<p>The entire discipline of multi-tenancy is the business of making software locks as trustworthy as brick walls. Everything else — the deployment models, the partitioning strategies, the isolation enforcement — is detail in service of that one goal.</p></div>
+
+<h3>The mixed estate</h3>
+<p>In practice, real estates are not uniform. Most residents live in the block. One resident is a jeweller who needs a vault and will pay for it. Another is a family who wants a garden and can afford a villa. The estate has a block <em>and</em> a few standalone buildings, managed by one estate office, on one set of grounds.</p>
+<p>This is where essentially every mature SaaS business ends up, and it has a name: <b>bridge</b>, or mixed mode. The majority of customers share everything. A small number, for reasons of regulation, scale or contract, get something dedicated. Crucially, the estate office runs all of it with one set of processes.</p>
+
+<div class="box warn"><span class="bt">Where the analogy breaks — and it matters</span>
+<p>Buildings are fixed. Software is not. A household cannot be quietly moved from the block to a villa overnight, but a tenant can — and a well-built system is designed so that this move is a configuration change rather than a reconstruction. If moving a customer between models requires rewriting the application, the model was chosen badly. Hold on to that idea; it recurs throughout Part III.</p></div>
+
+<h2><span class="num">3</span>What a &ldquo;Tenant&rdquo; Actually Is</h2>
+<p class="lede">The word is used loosely, including by people who should know better. Getting it precise early saves a great deal of confusion later.</p>
+
+<p>A <b>tenant</b> is the unit of separation, billing and administration in your system. It is the thing that, if two of them can see each other's data, you have a breach.</p>
+<p>A tenant is almost never a user. In CineChain, the tenant is <em>Nyati Cinemas</em> — the company. Grace the moviegoer, Brian the box-office clerk and Chris the chain administrator are all <em>users within</em> that tenant. They have wildly different permissions from one another, but they share one thing: they all sit inside the same boundary, and none of them may cross it.</p>
+
+<figure>{{d:tenant-hierarchy}}<figcaption><b>Figure 3.1.</b> The CineChain hierarchy. The tenant boundary sits at the chain level — everything below it belongs to exactly one tenant, and every row in every table below carries that tenant's identifier.</figcaption></figure>
+
+<h3>Choosing the boundary is a business decision</h3>
+<p>The single most consequential early decision is <em>where</em> to draw the tenant line, and it is frequently made by accident.</p>
+<p>For CineChain we could have chosen the individual <b>theatre</b> as the tenant. Each cinema building would then be separately isolated and separately billed. That sounds tidier, and it is wrong — because Chris, the chain administrator, needs a single view of revenue across all fourteen theatres. If each theatre were its own tenant, that cross-theatre report would require deliberately breaching the isolation boundary, and your architecture would be fighting your product on every screen.</p>
+
+<div class="box plain"><span class="bt">The test to apply</span>
+<p>Ask: <b>&ldquo;What is the largest group of users who must be able to see each other's data?&rdquo;</b> That group is your tenant. Draw the boundary any smaller and you will spend the life of the product building careful holes through your own security model.</p>
+<p>Then sanity-check it with a second question: <b>&ldquo;Who signs the contract and receives the invoice?&rdquo;</b> When these two answers disagree, you have found a genuine complication worth an afternoon of discussion — not something to resolve in a stand-up.</p></div>
+
+<h3>Tenants are not always companies</h3>
+<p>The boundary follows the isolation requirement, not the org chart. A few examples, to loosen the association:</p>
+<table>
+<thead><tr><th style="width:24%">System</th><th style="width:26%">The tenant is…</th><th>Why there</th></tr></thead>
+<tbody>
+<tr><td>CineChain</td><td>A cinema chain</td><td>Chains are commercial rivals; chain admins need cross-theatre reporting</td></tr>
+<tr><td>Hospital records platform</td><td>A hospital or health group</td><td>Regulation draws the line at the care provider, not the ward or the patient</td></tr>
+<tr><td>School management system</td><td>A school</td><td>Parents span schools; schools never span each other</td></tr>
+<tr><td>Consumer photo app</td><td>An individual person</td><td>There is no organisation — the person is the boundary</td></tr>
+<tr><td>Payroll for franchises</td><td>Sometimes the franchisor, sometimes the franchisee</td><td>Genuinely contested — and the kind of question that must be answered before the first table is created, not after</td></tr>
+</tbody></table>
+
+<div class="box warn"><span class="bt">The mistake that cannot be undone cheaply</span>
+<p>Changing the tenant boundary after launch means re-partitioning live data, re-issuing every credential, and rewriting every query in the system, all while customers are using it. Of everything in this document, this is the decision most worth an extra week of thought and the one most often made in an afternoon.</p></div>
+
+<h2><span class="num">4</span>The Vocabulary, Defined Once</h2>
+<p class="lede">These terms recur constantly in the rest of this document, and in Golding's book. They are defined here in plain language so that later sections can use them without ceremony.</p>
+
+<dl class="glossary">
+<dt>Tenant</dt><dd>The unit of isolation, billing and administration. In CineChain, a cinema chain.</dd>
+<dt>Tenant context</dt><dd>The knowledge, carried by a running request, of which tenant it is acting on behalf of. Nearly every mechanism in this document exists to establish it, carry it, or enforce it.</dd>
+<dt>Control plane</dt><dd>The part of the system that runs the <em>service</em>: signing up tenants, managing their settings, metering usage, billing. It is shared by all tenants and knows nothing about films or seats.</dd>
+<dt>Application plane</dt><dd>The part that runs the <em>product</em> your tenants actually bought. This is where films, screenings, seats and bookings live.</dd>
+<dt>Siloed</dt><dd>A resource dedicated to a single tenant. Strong separation, high cost.</dd>
+<dt>Pooled</dt><dd>A resource shared between tenants, with software enforcing the boundary. Low cost, requires discipline.</dd>
+<dt>Bridge (mixed mode)</dt><dd>Some layers pooled, others siloed — for example shared servers but a dedicated database. The pragmatic middle, and the most common real-world answer.</dd>
+<dt>Tenant isolation</dt><dd>The enforced guarantee that one tenant cannot reach another's resources. Distinct from authentication, and the distinction is the subject of Chapter 7.</dd>
+<dt>Data partitioning</dt><dd>How tenant data is physically arranged — separate databases, separate schemas, or shared tables with a tenant column.</dd>
+<dt>Noisy neighbour</dt><dd>One tenant consuming so much shared capacity that others suffer.</dd>
+<dt>Blast radius</dt><dd>How many tenants are affected when a given thing fails.</dd>
+<dt>Onboarding</dt><dd>The automated process that turns a signed contract into a working, isolated tenant environment.</dd>
+<dt>Tier</dt><dd>A named service level — Basic, Premium — that maps commercial packaging onto technical behaviour such as limits, isolation and support.</dd>
+<dt>Cost per tenant</dt><dd>What it actually costs you to serve one tenant. Invisible by default; the foundation of every pricing decision.</dd>
+</dl>
+
+<div class="box book"><span class="bt">Where this comes from</span>
+<p><em>The silo / pool / bridge vocabulary, and the control-plane / application-plane split, are drawn from Tod Golding's</em> Building Multi-Tenant SaaS Architectures <em>(O'Reilly, 2024), which is the reference work in this field. This document uses his terms deliberately so that the two read as companions. Chapter 20 maps every section here to the relevant chapter there.</em></p></div>
+
+<div class="part">
+  <div class="pn">Part II</div>
+  <h2>The Anatomy</h2>
+  <p>What a multi-tenant system is actually made of. Still mostly conceptual, but we begin to look at how requests move and where the boundaries are drawn.</p>
+</div>
+
+<h2 class="cont"><span class="num">5</span>The Two Halves of Every SaaS System</h2>
+<p class="lede">Once you see this split, you cannot unsee it — and a surprising number of architectural arguments dissolve the moment someone draws it on a whiteboard.</p>
+
+<p>Every multi-tenant system contains two quite different kinds of software, and confusing them is a reliable source of tangled design.</p>
+<p>The first kind runs <b>the product your customers bought</b>. For CineChain that is films, screenings, seat maps, bookings, tickets and refunds. Every request here <em>acts on exactly one tenant's data</em> — though, as Chapter 7 shows, that tenant is not always established the same way. This is the <b>application plane</b>.</p>
+<p>The second kind runs <b>the service you are operating</b>. Signing up a new cinema chain, recording what each chain consumed, producing invoices, changing a chain's plan, suspending one that has not paid.<span class="cite">G ch. 2, &ldquo;Inside the Control Plane&rdquo;, pp. 29&ndash;33</span> None of this code knows what a film is. All of it spans every tenant at once. This is the <b>control plane</b>.<span class="cite">G ch. 2, &ldquo;The Two Halves of Every SaaS Architecture&rdquo;, p. 27</span></p>
+
+<figure>{{d:two-planes}}<figcaption><b>Figure 5.1.</b> The two planes. Notice the direction of the arrows: the control plane pushes configuration down, and the application plane pushes usage measurements back up. That loop is what makes metered billing possible.</figcaption></figure>
+
+<h3>Why the distinction earns its keep</h3>
+<p>Four practical consequences follow, and each one saves real pain.</p>
+<dl>
+<dt>They have opposite security postures</dt>
+<dd>Application-plane code must be rigorously confined to one tenant. Control-plane code must deliberately see all of them. If both live in the same service with the same database credentials, then every application bug is one logic error away from a cross-tenant breach — because the capability to cross was sitting right there.</dd>
+<dt>They scale on different signals</dt>
+<dd>When a blockbuster opens, the application plane may need six times the capacity. The control plane does not care at all: nobody signs up six times as many cinema chains because a film came out. Separating them lets you scale the expensive half without dragging the other along.</dd>
+<dt>They fail with different severity</dt>
+<dd>If onboarding breaks, no new tenants can join — a bad afternoon. If the booking service breaks, every cinema in the country stops selling tickets. These deserve different availability targets, different on-call urgency and different budgets.</dd>
+<dt>They are built by different people, eventually</dt>
+<dd>The control plane is the operator's product. The application plane is the customer's product. As a company grows these become different teams with different roadmaps, and a system that anticipated that split is far easier to divide.</dd>
+</dl>
+
+<div class="box note"><span class="bt">The most common beginner's shortcut</span>
+<p>Teams routinely add an <code>is_platform_admin</code> flag to the ordinary user table and call it a control plane. It works, briefly. What it means is that a single mistaken boolean — a bad default, a mis-seeded test record, a privilege-escalation bug — grants full cross-tenant access inside the same code path that serves ordinary customers. Keep the operator's console a genuinely separate application, with separate credentials. It is not more work; it is just work done in a different order.</p></div>
+
+<h3>What belongs where</h3>
+<table>
+<thead><tr><th style="width:34%">Capability</th><th style="width:20%">Plane</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Browsing films and showtimes</td><td>Application</td><td>Tenant-scoped product behaviour</td></tr>
+<tr><td>Holding and booking a seat</td><td>Application</td><td>The core product</td></tr>
+<tr><td>Creating a new cinema chain account</td><td>Control</td><td>Spans tenants; runs before a tenant exists</td></tr>
+<tr><td>Changing a chain from Standard to Premium</td><td>Control</td><td>Commercial configuration, not product behaviour</td></tr>
+<tr><td>Recording that Nyati made 41 000 bookings</td><td>Both</td><td>Emitted by the application plane, aggregated by the control plane</td></tr>
+<tr><td>Suspending a chain for non-payment</td><td>Control</td><td>Operator action; the application plane merely honours the resulting state</td></tr>
+<tr><td>A chain admin adding a new theatre</td><td>Application</td><td>Tenant self-administration is still inside the tenant boundary</td></tr>
+</tbody></table>
+<p>That last row is a common stumbling point. &ldquo;Administration&rdquo; is not the same as &ldquo;control plane&rdquo;. Chris adding a theatre to Nyati is tenant-scoped work, and belongs in the application plane. The test is not <em>&ldquo;is this an admin action?&rdquo;</em> but <em>&ldquo;does this act on one tenant, or across all of them?&rdquo;</em></p>
+
+<h2><span class="num">6</span>Tenant Context: The Golden Thread</h2>
+<p class="lede">If a request does not know which tenant it belongs to, nothing else in this document can save you. Establishing and carrying that knowledge is the single most important mechanism in a multi-tenant system.</p>
+
+<p>Consider a request arriving at CineChain: <code>GET /screenings/88/seats</code>. The system must answer a question before it can do anything else — <em>whose screening 88?</em> Nyati has a screening 88. So does Prestige. Answering wrongly is a data breach.</p>
+<p>The knowledge of which tenant a request is acting for is called <b>tenant context</b><span class="cite">G ch. 2, p. 34; ch. 7, &ldquo;Extracting Tenant Context&rdquo;, p. 172</span>, and there are exactly three things to get right about it: where it comes from, how it travels, and who is allowed to trust it.</p>
+
+<figure>{{d:tenant-context-flow}}<figcaption><b>Figure 6.1.</b> The journey of tenant context for a member of staff, from login to database row. The two shaded panels are the two places where a request can be rejected — and both must exist. Chapter 7 covers the other case, where the user belongs to no tenant.</figcaption></figure>
+
+<h3>Where it comes from</h3>
+<p>This chapter describes the case that is true of all B2B software and of the staff half of every consumer-facing product: <b>the user belongs to a tenant.</b> When such a user logs in, the identity system establishes who they are <em>and</em> which tenant they belong to, writes both facts into a cryptographically signed token, and hands it back. Every subsequent request carries it.</p>
+<p>Because the token is signed, the application can verify its contents have not been altered. A user cannot edit their token to say <code>tenant_id: prestige</code>, because the signature would no longer match.</p>
+
+<div class="box note"><span class="bt">Hold one assumption lightly</span>
+<p>Everything below assumes the user belongs to a tenant. For staff that is right. For the general public buying from those tenants it is not — and building on the assumption produces a system where a customer of one chain cannot buy from another. Chapter 7 takes that case apart properly. Read this chapter first; it is the foundation the other builds on.</p></div>
+
+<div class="box warn"><span class="bt">The rule that prevents most real-world breaches</span>
+<p>Tenant context must come from a source the caller cannot forge. For a user who <em>belongs to</em> a tenant — staff — that source is the verified token, and <b>never</b> a URL path, query parameter, request body or custom header, all of which the caller controls.</p>
+<p>For a user who belongs to no tenant — a member of the public buying a ticket — the tenant is resolved <em>from the resource being acted on</em>, server-side. Chapter 7 deals with that case in full. The invariant covering both is the same: never accept the caller's assertion of <b>which tenant to act as</b>.</p>
+<p>The classic breach in multi-tenant systems is not exotic. It is a perfectly ordinary logged-in user changing <code>/api/bookings/4471</code> to <code>/api/bookings/4472</code> and discovering that it belongs to a competitor. If your system trusts an identifier in a URL, it is already vulnerable, and no amount of encryption elsewhere compensates.</p></div>
+
+<h3>How it travels: ambient, not passed around</h3>
+<p>Once extracted, the tenant identifier has to reach every piece of code that touches data. The obvious approach — pass it as a parameter to every function — works exactly until the first developer forgets, which is a matter of weeks.</p>
+<p>The durable approach is to make tenant context <b>ambient</b><span class="cite">G ch. 7, &ldquo;Interception Tools and Strategies&rdquo;, pp. 183&ndash;186</span>: stored once, at the edge, in a place that every layer can read without being handed it. Every mainstream platform has a mechanism for this, and the names differ more than the ideas.</p>
+<table>
+<thead><tr><th style="width:24%">Platform</th><th style="width:34%">Mechanism</th><th>Character</th></tr></thead>
+<tbody>
+<tr><td>Node.js / NestJS</td><td><code>AsyncLocalStorage</code></td><td>Truly ambient; survives every <code>await</code> without touching signatures</td></tr>
+<tr><td>Go</td><td><code>context.Context</code></td><td>Explicit but already idiomatic — it is in every signature anyway</td></tr>
+<tr><td>Java / Spring</td><td><code>ThreadLocal</code> or request scope</td><td>Mature; needs care with reactive and async code</td></tr>
+<tr><td>Python / Django</td><td><code>contextvars</code>, middleware</td><td>Works across async and sync views</td></tr>
+<tr><td>.NET</td><td><code>AsyncLocal</code>, scoped DI</td><td>Integrates cleanly with the container</td></tr>
+</tbody></table>
+
+<div class="box key"><span class="bt">The design principle underneath</span>
+<p>Make the secure path the <em>default</em> path, and the insecure path something a developer would have to work to write. A new engineer joining in eighteen months should get tenant-scoped behaviour by doing nothing special at all. Security that depends on everyone remembering a rule is not security; it is a queue of future incidents.</p></div>
+
+<h3>Who trusts it: nobody, twice</h3>
+<p>The most important structural idea in Figure 6.1 is that the boundary is enforced <b>twice</b>, by two independent mechanisms.</p>
+<p>The application layer scopes its queries to the current tenant. Underneath it, the <em>database itself</em> refuses to return rows belonging to anyone else — a mechanism we look at properly in Chapter 9.</p>
+<p>This is not belt-and-braces paranoia; it is a response to how these systems actually fail. Application code is written under deadline by people who are human. Someone will eventually write a query that forgets its tenant filter, and it will pass code review because it looks completely ordinary. The database policy is what makes that ordinary mistake harmless instead of catastrophic.</p>
+
+<h3>How the request arrives in the first place</h3>
+<p>Before context can be extracted, the request has to reach you, and there are three common shapes for that.<span class="cite">G ch. 6, &ldquo;Entering the Front Door&rdquo;, pp. 138&ndash;145</span> They differ less than they appear to, because the rule at the end of this section overrides all of them.</p>
+
+<figure>{{d:routing-strategies}}<figcaption><b>Figure 6.2.</b> Three routing conventions. The bottom panel is the part that matters: whatever the URL says, the tenant you act on comes from the token.</figcaption></figure>
+
+<p>A subdomain per tenant (<code>nyati.cinechain.app</code>)<span class="cite g2">MS — Map requests to tenants</span> tells you the tenant before anyone logs in, which is useful for branding a login page, at the cost of wildcard DNS and certificates. A single domain with the tenant carried only in the token is the simplest to operate and the best default. A path prefix (<code>/t/nyati/…</code>) is trivial to route and read in logs, but it publicises your customer list and tempts developers into trusting it.</p>
+<p>That temptation is the whole risk. A subdomain or a path is a <em>hint</em> — useful for choosing a login page or a cache key. It is never the authority for a data access decision. If the path says <code>prestige</code> and the token says <code>nyati</code>, that mismatch is not a routing edge case to resolve helpfully; it is an attempted crossing, and the correct response is to refuse it.</p>
+
+<h2><span class="num">7</span>Identity — and Who Your Users Actually Are</h2>
+<p class="lede">Two errors live in this chapter. The first is treating authentication as though it were isolation. The second, subtler and more damaging to a consumer-facing product, is assuming that every user belongs to a tenant.</p>
+
+<figure>{{d:isolation-vs-auth}}<figcaption><b>Figure 7.1.</b> Two questions that sound related and are not. Authentication happens once, at the door. Isolation must happen on every single access, forever.</figcaption></figure>
+
+<p>Golding puts an entire section of his book under the heading <em>&ldquo;Tenant Authentication Is Not Tenant Isolation&rdquo;</em><span class="cite">G ch. 4, p. 111</span>, and it earns the emphasis. The confusion is seductive because the login system is the place where tenant identity first appears — so it feels as though that is where tenancy is handled.</p>
+<p>But look carefully at what logging in actually achieves. It establishes that Grace is Grace, and that Grace belongs to Nyati. That is all. It says nothing whatsoever about whether the request Grace is <em>currently making</em> is confined to Nyati's data. A perfectly authenticated user making a request for another tenant's booking is not an authentication failure — the authentication worked exactly as designed. It is an isolation failure, and only an isolation control can stop it.</p>
+
+<div class="box plain"><span class="bt">A useful way to hold the two apart</span>
+<p><b>Authentication</b> is the lock on the building's front door. It runs once, and afterwards you are inside.</p>
+<p><b>Isolation</b> is the lock on each flat. It runs every single time anyone reaches for a door handle, including people who legitimately live in the building.</p>
+<p>A building with an excellent front door and no locks on the flats is not secure. It is a building where everyone has agreed to be polite.</p></div>
+
+<h3>What identity must nonetheless get right<span class="cite g2">MS — Identity in multitenant solutions</span></h3>
+<p>Identity is not the whole answer, but it is a necessary part of it, and multi-tenancy puts specific demands on it.</p>
+<dl>
+<dt>The token must carry the tenant<span class="cite">G ch. 4, &ldquo;Populating Custom Claims During Onboarding&rdquo;, p. 105</span></dt>
+<dd>A custom claim — <code>tenant_id</code> — is written at login. Without it, every downstream service would need a database lookup just to discover who it is serving, which is both slow and a new place to get it wrong.</dd>
+<dt>It must also carry enough to make decisions</dt>
+<dd>Typically the tenant's <code>tier</code> and the user's <code>role</code>. This lets rate limiting and feature gating happen at the edge without a round trip.</dd>
+<dt>But not too much<span class="cite">G ch. 4, &ldquo;Using Custom Claims Judiciously&rdquo;, p. 105</span></dt>
+<dd>Tokens are cached and long-lived. Anything in a token is a snapshot that may be stale for its whole lifetime. Put slow-changing facts in; keep fast-changing ones out. If a tenant's tier changes at 10:00, a token issued at 09:58 will still claim the old tier — so tier changes need either short token lifetimes or a revalidation path.</dd>
+<dt>One person, two tenants<span class="cite">G ch. 4, &ldquo;Sharing User IDs Across Tenants&rdquo;, p. 111</span></dt>
+<dd>Grace may genuinely buy from two chains with the same e-mail address. This is not an edge case; it is the normal case, and the next section is devoted to it.</dd>
+</dl>
+
+<h3>7.1 The mistake this chapter exists to prevent</h3>
+<p>Everything so far has quietly assumed that a user <em>belongs to</em> a tenant. For staff that is true. For the people who actually buy your product, it very often is not — and assuming it produces a system that fails in an obvious, embarrassing way.</p>
+
+<div class="box warn"><span class="bt">The failure, concretely</span>
+<p>Grace signs up and the system stamps <code>tenant_id: nyati</code> into her token, because she first bought a ticket from Nyati Cinemas. She travels to Mombasa, where the nearest cinema is a Prestige one. She opens the app and <b>cannot book</b> — the system has concluded she has no business at Prestige.</p>
+<p>The token is behaving exactly as designed. The design is wrong. Grace does not belong to Nyati; she <em>bought something from</em> Nyati once.</p></div>
+
+<h3>7.2 Three populations, not one</h3>
+<p>Any system where businesses serve the general public — cinemas, clinics, couriers, hotels — has three kinds of user, and they relate to tenancy differently. Conflating them is the error.</p>
+
+<figure class="fig-wide">{{d:identity-planes}}<figcaption><b>Figure 7.2.</b> The three populations. Only tenant staff carry a tenant in their token; for everyone else the tenant is established another way, or not at all.</figcaption></figure>
+
+<table>
+<thead><tr><th style="width:22%">Population</th><th style="width:20%">Belongs to</th><th style="width:24%">Tenant comes from</th><th>The security question</th></tr></thead>
+<tbody>
+<tr><td><b>Platform operator</b></td><td>No tenant</td><td>Nothing — spans all</td><td>Are they confined to aggregates rather than tenant data?</td></tr>
+<tr><td><b>Tenant staff</b></td><td>Exactly one tenant</td><td><b>The token</b></td><td>Which tenant's data may I read?</td></tr>
+<tr><td><b>Consumer</b></td><td>No tenant, or many</td><td><b>The resource</b></td><td>Is this booking mine?</td></tr>
+</tbody></table>
+
+<div class="box key"><span class="bt">The sentence that resolves it</span>
+<p>For staff, the tenant is an attribute of <b>the actor</b>. For a consumer, the tenant is an attribute of <b>the transaction</b>.</p>
+<p>A box-office clerk <em>is</em> a Nyati employee — that fact travels with them into every request they make. A moviegoer is not a Nyati anything. She is a person who, on Tuesday, bought a seat that happened to belong to Nyati, and who on Friday may buy one from Prestige.</p></div>
+
+<p>Notice that the security question changes too, and this is the part most often missed. For staff it is a tenant-isolation question, answered by the mechanisms in Chapter 10. For a consumer it is an <b>ownership</b> question — <em>is this booking yours?</em> — which is object-level authorisation, a different mechanism. A system serving both populations needs both, and needs to know which it is applying.</p>
+
+<h3>7.3 Where the tenant comes from for a consumer</h3>
+<p>If not from the token, then from what? From the resource, resolved server-side.</p>
+<p>When Grace opens a seat map for screening 88, the server looks up that screening and reads its <code>tenant_id</code>. She never states a tenant, never sees the word, and cannot influence the answer. This is not the forbidden &ldquo;trusting the URL&rdquo; of Chapter 6 — she supplies an <em>object identifier</em>, and the server derives the tenant from its own data. What would be forbidden is accepting a <code>tenant_id</code> she supplied alongside it.</p>
+
+<div class="box good"><span class="bt">A property worth designing for deliberately</span>
+<p>In a system like this, the tenant boundary should be <b>invisible to the consumer</b>. Grace does not think &ldquo;I am a Nyati user&rdquo;. She thinks &ldquo;I am going to the cinema at Garden City&rdquo;. She picks a venue, and the tenancy follows silently from it.</p>
+<p>When your architecture matches how the customer already thinks, you stop having to explain it to them — and you stop building selector screens that exist only because the data model leaked.</p></div>
+
+<h3>7.4 The case with no account at all</h3>
+<p>There is a simpler option that teams building B2B software routinely forget exists: <b>let the customer buy without an account.</b> Most real cinema ticketing works this way, and it is worth taking seriously rather than treating as a fallback.</p>
+
+<figure class="fig-wide">{{d:guest-booking-flow}}<figcaption><b>Figure 7.3.</b> Guest checkout and the registered path, converging on the same booking. In both, the tenant is decided by the venue the customer picked.</figcaption></figure>
+
+<p>The customer picks a cinema, a film, a time and a seat, gives a name and an e-mail, pays, and receives a ticket. No password, no verification e-mail, no account. The whole identity question is deferred until it is actually needed — which, for a single ticket purchase, is never.</p>
+<p>This changes one mechanism. A five-minute seat hold normally belongs to a user; with no user, it must belong to something else. The answer is a <b>signed hold token</b> the server issues and the browser returns: an opaque string containing the hold id and an expiry, signed so it cannot be altered. Possession of the token is the claim to the seat.</p>
+
+<div class="box note"><span class="bt">Guest checkout is better for isolation in one way, and worse in another</span>
+<p><b>Better:</b> there is no long-lived credential to steal. A password that never existed cannot be reused against another site.</p>
+<p><b>Worse:</b> the ticket in the e-mail becomes a bearer credential — whoever holds it can use it. So the code must be high-entropy, signed, single-use and non-enumerable, and any &ldquo;view my booking&rdquo; link must be a signed, expiring URL rather than a guessable reference. Retrieval by booking reference alone is an invitation to enumerate.</p></div>
+
+<h3>7.5 One consumer, many tenants</h3>
+<p>Now the case your product people will ask for: a single account that works across every business on the platform, with loyalty at each. This is the Uber-and-Bolt arrangement — one identity, many providers — and it is entirely compatible with strict tenant isolation, provided the identity sits in the right place.</p>
+<p>Two records, on opposite sides of the tenant boundary:</p>
+
+<div class="code-label">The consumer identity — platform-level, outside the tenant boundary</div>
+<pre><code><span class="cm">-- Lives in a platform schema. No tenant_id. No RLS policy.</span>
+<span class="cm">-- Reachable only through the identity service — never from a</span>
+<span class="cm">-- tenant-scoped query.</span>
+<span class="kw">CREATE TABLE</span> platform.consumer (
+  id           uuid <span class="kw">PRIMARY KEY</span>,
+  email        citext <span class="kw">NOT NULL UNIQUE</span>,   <span class="cm">-- one person, one account</span>
+  phone        text,
+  display_name text
+);
+
+<span class="cm">-- The per-tenant projection: what this chain knows about her,</span>
+<span class="cm">-- because she transacted with THIS chain. Fully RLS-guarded.</span>
+<span class="kw">CREATE TABLE</span> tenant_customer (
+  tenant_id      uuid <span class="kw">NOT NULL</span>,
+  consumer_id    uuid,                <span class="cm">-- NULL for guest purchases</span>
+  email          citext <span class="kw">NOT NULL</span>,
+  loyalty_points int <span class="kw">NOT NULL DEFAULT</span> 0,
+  first_seen_at  timestamptz <span class="kw">NOT NULL DEFAULT</span> now(),
+  <span class="kw">PRIMARY KEY</span> (tenant_id, email)
+);</code></pre>
+
+<p>Grace logs in once. Her token carries her consumer id and <b>no tenant claim at all</b>. She browses every chain's cinemas, books at any of them, and accrues loyalty points at each — held on the <code>tenant_customer</code> row, not on her platform identity.</p>
+
+<div class="box key"><span class="bt">Why this does not breach isolation</span>
+<p>A chain queries <code>tenant_customer</code> and sees only people who have transacted with <em>it</em> — row-level security guarantees that, exactly as for every other tenant table. Nyati knows about Grace because she bought a ticket from them, not because they can browse the platform's customer list.</p>
+<p>And they cannot browse it: <code>platform.consumer</code> lives outside the tenant boundary entirely. No tenant-scoped query reaches it. So the answer to <em>&ldquo;can Nyati tell that Grace also uses Prestige?&rdquo;</em> is no — there is no path from their row to Prestige's row.</p>
+<p>One practical corollary: do not expose <code>consumer_id</code> in tenant-facing APIs. It is an internal join key, and a shared opaque identifier handed to two parties is precisely the raw material for the correlation you are preventing.</p></div>
+
+<p>This arrangement also pays for itself in a way teams do not anticipate. Because the key on <code>tenant_customer</code> is <code>(tenant_id, email)</code>, a guest who later registers with the same address is linked to their own purchase history automatically. Guest checkout and accounts stop being two separate systems.</p>
+
+<div class="box warn"><span class="bt">The deliberate hole, named</span>
+<p><code>platform.consumer</code> is a cross-tenant table in an otherwise strict model. That is a real exception and should be treated as one: reachable through exactly one service, never joined to from tenant-scoped code, and audited. Every multi-tenant system ends up with one or two such tables. The danger is not having them — it is having them by accident, without anyone having written down that they exist.</p></div>
+
+<h3>7.6 What this means for tokens</h3>
+<p>The upshot is a clean, checkable rule at the edge of your API: <b>the presence or absence of a tenant claim decides which half of the system a token can reach.</b></p>
+<table>
+<thead><tr><th style="width:22%">Token</th><th style="width:30%">Carries</th><th>Valid on</th></tr></thead>
+<tbody>
+<tr><td>Platform operator</td><td><code>scope: platform</code>, no tenant</td><td>Control plane. Aggregates, never tenant data</td></tr>
+<tr><td><b>Staff</b></td><td><b><code>tenant_id</code></b>, role, tier</td><td>Tenant-scoped endpoints. Sets the session tenant; RLS applies</td></tr>
+<tr><td><b>Consumer</b></td><td><code>scope: consumer</code>, no tenant</td><td>Public and booking endpoints. Ownership checked per resource</td></tr>
+</tbody></table>
+<p>Both crossings must be refused, and the second is the one teams forget. A consumer token reaching a staff endpoint is plain privilege escalation. A <em>staff</em> token reaching a consumer endpoint is subtler and just as serious: it would let a Nyati clerk transact as a customer of Prestige. Neither is a 404 — both are a 403, logged as a security event.</p>
+
+<div class="box plain"><span class="bt">And staff who work for two chains?</span>
+<p>They get two accounts. That is not a compromise — it is correct. A clerk's session must be unambiguously one tenant's, because everything they do is attributed to that tenant. The multi-tenant identity is a property of consumers, who transact, not of staff, who act on a tenant's behalf.</p></div>
+
+<div class="part">
+  <div class="pn">Part III</div>
+  <h2>The Big Decisions</h2>
+  <p>Four choices shape everything else: how much you share, where data lives, how the boundary is enforced, and how much of the system one tenant can damage. This is the heart of the subject.</p>
+</div>
+
+<h2 class="cont"><span class="num">8</span>Silo, Pool and Bridge</h2>
+<p class="lede">The deployment model is your answer to one question, asked of every layer of your system: <b>is this resource dedicated to one tenant, or shared between many?</b></p>
+
+<figure>{{d:silo-pool-bridge}}<figcaption><b>Figure 8.1.</b> The three deployment models. Read the bottom panel carefully — these are not three products to choose between, but three settings of a dial you turn independently for each layer.</figcaption></figure>
+
+<h3>The insight that changes how you use these terms</h3>
+<p>Newcomers<span class="cite g2">MS — Tenancy models</span> treat silo and pool<span class="cite">G ch. 3, &ldquo;Introducing the Silo and Pool Models&rdquo;, p. 51</span> as a single system-wide choice: &ldquo;we are a pooled SaaS&rdquo;. Experienced teams treat them as a choice made <b>per resource, per tenant</b>.</p>
+<p>CineChain might reasonably run with shared servers for everyone; a shared database for Basic and Standard chains; a dedicated database for Premium chains; and a completely separate stack for one chain whose contract demands it. That is four different arrangements running simultaneously, from one codebase, and it is entirely normal. Golding calls the combination <b>mixed mode</b><span class="cite">G ch. 3, &ldquo;The Mixed Mode Deployment Model&rdquo;, p. 75</span>; the two-layer case where compute is pooled and storage siloed is the classic <b>bridge</b>.</p>
+
+<div class="box key"><span class="bt">The property that makes all of this work</span>
+<p>Your application code must not know or care which model a tenant is on. It asks for &ldquo;the database for the current tenant&rdquo; and receives a connection. Whether that connection points at a shared database or a dedicated one is a <em>configuration lookup</em>, resolved at the edge of the system.</p>
+<p>The moment you have <code>if (tenant.isPremium) { … }</code> scattered through business logic, you have started building two products, and every future feature costs twice.</p></div>
+
+<h3>Choosing, honestly</h3>
+<table class="lg">
+<caption>What actually drives the choice — and what only appears to</caption>
+<thead><tr><th style="width:30%">Force</th><th style="width:20%">Pushes toward</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><b>Regulation or contract</b><br>data residency, dedicated keys</td><td><span class="no">Silo</span></td><td>The only genuinely non-negotiable driver. If a regulator requires physical separation, no amount of logical isolation substitutes.</td></tr>
+<tr><td><b>Cost and margin</b></td><td><span class="yes">Pool</span></td><td>Usually decisive for the long tail. A pooled tenant can cost a hundredth of a siloed one.</td></tr>
+<tr><td><b>Extreme load from one tenant</b></td><td><span class="mid">Bridge</span></td><td>Silo the resource under pressure — often storage — and leave the rest pooled.</td></tr>
+<tr><td><b>Noisy-neighbour risk</b></td><td><span class="mid">Bridge</span></td><td>Try throttling first. Siloing to fix load is an expensive way to avoid writing a rate limiter.</td></tr>
+<tr><td><b>Blast-radius targets</b></td><td><span class="mid">Pods</span></td><td>Cells of N tenants give you a middle setting between &ldquo;one&rdquo; and &ldquo;everyone&rdquo;.</td></tr>
+<tr><td><b>Operational capacity</b></td><td><span class="yes">Pool</span></td><td>A team of four cannot operate 200 siloed stacks, whatever the architecture diagram says.</td></tr>
+<tr><td class="s-sm"><i>&ldquo;This customer is important&rdquo;</i></td><td class="s-sm"><i>nothing</i></td><td class="s-sm">Importance is not a technical requirement. Ask what it actually implies — load, obligation, risk — and decide on that.</td></tr>
+</tbody></table>
+
+<figure>{{d:decision-tree}}<figcaption><b>Figure 8.2.</b> A decision procedure to run per resource. Most resources reach the bottom and stay pooled — which is the correct and intended outcome.</figcaption></figure>
+
+<h3>The pod model, briefly</h3>
+<p>There is a fourth arrangement worth knowing. Instead of one enormous pool or many silos, you run a number of identical <b>pods</b><span class="cite g2">Shopify — Pods architecture</span><span class="cite">G ch. 3, &ldquo;The Pod Deployment Model&rdquo;, p. 77</span> (Golding's term; also called cells), each a complete copy of the system serving perhaps fifty tenants.</p>
+<p>Pods give you a deliberate, tunable blast radius and a natural deployment unit — you can release to one pod and watch. The cost is that you now operate many copies of everything, and tenants occasionally need to move between pods to rebalance. It is a strategy for a system that has already succeeded, not a starting point.</p>
+
+<h2><span class="num">9</span>Where Tenant Data Lives</h2>
+<p class="lede">Data partitioning is the decision with the longest shadow. Compute can be re-shaped in an afternoon; data cannot. This chapter works through the three options in detail, because this is the question readers of this document are most often actually trying to answer.</p>
+
+<figure>{{d:data-partitioning}}<figcaption><b>Figure 9.1.</b> Three ways to partition tenant data. Separation decreases and efficiency increases as you move right — and the recommendation is nonetheless to start on the right.</figcaption></figure>
+
+<p>Golding treats this as its own chapter <span class="cite">G ch. 8, pp. 189–218</span> and makes one framing point early that is worth adopting: partitioning<span class="cite g2">MS — Storage and data approaches</span> is not a single system-wide decision. It is asked <em>per service</em>, because the storage that suits one workload may not suit another.<span class="cite">G ch. 8, &ldquo;The Right Tool for the Job&rdquo;, p. 195</span></p>
+
+<h3>9.1 The three models, concretely</h3>
+<p>Before comparing them, it helps to see exactly what each one does to the same question: <em>&ldquo;give me booking 4471&rdquo;.</em></p>
+
+<figure class="fig-wide">{{d:partition-anatomy}}<figcaption><b>Figure 9.2.</b> The anatomy of each model. Note where the tenant is chosen in each: in a predicate, in the session, or in the connection itself.</figcaption></figure>
+
+<h4>Model A — shared tables with a tenant identifier</h4>
+<p>Every tenant's rows sit in the same tables. A <code>tenant_id</code> column on every row says who each one belongs to. This is what Golding calls <b>pooled relational partitioning</b>, and his description of the mechanics is exactly this: you take your existing design and introduce a tenant identifier to associate rows with a tenant, at which point the tenant identifier becomes the leading index and your former primary key becomes secondary.<span class="cite">G ch. 8, &ldquo;Pooled Relational Data Partitioning&rdquo;, p. 200</span></p>
+
+<div class="code-label">Model A — one schema, one set of tables</div>
+<pre><code><span class="kw">CREATE TABLE</span> booking (
+  id         uuid <span class="kw">PRIMARY KEY</span>,
+  tenant_id  uuid <span class="kw">NOT NULL</span>,          <span class="cm">-- ◀ the discriminator</span>
+  reference  text <span class="kw">NOT NULL</span>,
+  total_minor int <span class="kw">NOT NULL</span>,
+  <span class="cm">-- uniqueness is WITHIN a tenant, never global</span>
+  <span class="kw">UNIQUE</span> (tenant_id, reference)
+);
+
+<span class="cm">-- tenant_id leads every index, or the database scans across tenants</span>
+<span class="kw">CREATE INDEX</span> <span class="kw">ON</span> booking (tenant_id, created_at <span class="kw">DESC</span>);
+
+<span class="cm">-- and the boundary is enforced by the database, not by the caller</span>
+<span class="kw">ALTER TABLE</span> booking <span class="kw">ENABLE ROW LEVEL SECURITY</span>;
+<span class="kw">ALTER TABLE</span> booking <span class="kw">FORCE  ROW LEVEL SECURITY</span>;
+<span class="kw">CREATE POLICY</span> tenant_isolation <span class="kw">ON</span> booking
+  <span class="kw">USING</span>      (tenant_id = current_setting(<span class="st">'app.tenant_id'</span>, true)::uuid)
+  <span class="kw">WITH CHECK</span> (tenant_id = current_setting(<span class="st">'app.tenant_id'</span>, true)::uuid);
+
+<span class="cm">-- per request, inside the transaction:</span>
+<span class="kw">SET LOCAL</span> app.tenant_id = <span class="st">'nyati-uuid'</span>;
+<span class="kw">SELECT</span> * <span class="kw">FROM</span> booking <span class="kw">WHERE</span> id = 4471;   <span class="cm">-- sees only Nyati's row</span></code></pre>
+
+<p><b>What you gain.</b><span class="cite g2">Azure SQL — SaaS tenancy patterns</span> One schema. One migration, ever. One connection pool. Adding a tenant is an <code>INSERT</code>, so onboarding is genuinely instant. Cross-tenant platform queries — &ldquo;how many bookings today?&rdquo; — are ordinary SQL. It scales to tens of thousands of tenants without the operational story changing at all.</p>
+<p><b>What you pay.</b> The boundary is logical. A query missing its tenant predicate returns other tenants' rows, which is why row-level security is not optional here — it is the thing that makes the model safe. One enormous tenant inflates shared indexes for everyone. Per-tenant restore means extracting rows rather than restoring a backup. And deleting a departing tenant means a careful, ordered delete across every table.</p>
+
+<h4>Model B — one database, a schema per tenant</h4>
+<p>A single PostgreSQL database contains many schemas — <code>nyati</code>, <code>prestige</code>, <code>sarit</code> — each holding a complete, identical set of tables. The tenant is selected by setting the search path before querying.</p>
+
+<div class="code-label">Model B — one database, many schemas</div>
+<pre><code><span class="cm">-- once per tenant, at onboarding</span>
+<span class="kw">CREATE SCHEMA</span> nyati;
+<span class="kw">CREATE TABLE</span> nyati.booking (
+  id          uuid <span class="kw">PRIMARY KEY</span>,
+  reference   text <span class="kw">NOT NULL UNIQUE</span>,   <span class="cm">-- global uniqueness is now correct</span>
+  total_minor int  <span class="kw">NOT NULL</span>
+);                                     <span class="cm">-- no tenant_id column at all</span>
+
+<span class="cm">-- per request</span>
+<span class="kw">SET LOCAL</span> search_path = nyati;
+<span class="kw">SELECT</span> * <span class="kw">FROM</span> booking <span class="kw">WHERE</span> id = 4471;</code></pre>
+
+<p><b>What you gain.</b> Clean mental separation — a tenant's data is a visible, nameable object you can dump, inspect and drop. Uniqueness constraints become natural again. Dropping a tenant is <code>DROP SCHEMA nyati CASCADE</code>, which is a genuinely strong answer to a deletion request. All of this while keeping one server and one connection pool.</p>
+<p><b>What you pay.</b> Every migration now runs once per schema. At 400 tenants, a schema change is an orchestrated, resumable job with per-tenant status, retry and partial-failure handling — which is most of the operational burden of Model C without most of its isolation benefit. PostgreSQL's system catalogues also grow with every table in every schema; teams typically begin to feel this in the low thousands of schemas, in slow <code>pg_dump</code>, autovacuum pressure and planning time.</p>
+
+<div class="box warn"><span class="bt">The trap in the middle</span>
+<p>Model B is frequently chosen as a compromise by teams who cannot decide between A and C. It is a legitimate destination for a specific reason — usually per-tenant dump-and-restore, or a compliance officer who wants to see separate objects — but it is a poor <em>default</em>.</p>
+<p>The reason is that its costs scale with tenant count in the same way Model C's do, while its blast radius stays shared like Model A's. You end up paying C's operational bill for A's isolation guarantee. If you are choosing B, be able to name the specific requirement it satisfies that A does not.</p></div>
+
+<h4>Model C — a database per tenant</h4>
+<p>Each tenant gets a physically separate database — and, in the strongest form, separate compute, separate credentials, separate backups and possibly a separate encryption key.</p>
+
+<div class="code-label">Model C — separate databases</div>
+<pre><code><span class="cm">-- identical schema to Model B, but in its own database</span>
+<span class="kw">CREATE DATABASE</span> nyati_db;
+<span class="cm">-- \c nyati_db  — then apply exactly the same migration set</span>
+
+<span class="cm">-- the tenant is chosen when the connection is opened, not per query</span>
+<span class="cm">-- postgres://app@db-nyati.internal/nyati_db</span>
+<span class="kw">SELECT</span> * <span class="kw">FROM</span> booking <span class="kw">WHERE</span> id = 4471;</code></pre>
+
+<p>Golding notes that relational silos actually come in three grades — an <b>instance</b> per tenant, a <b>database</b> per tenant inside a shared instance, or a <b>table</b> per tenant inside a shared database — and that the right choice depends partly on the limits of your engine.<span class="cite">G ch. 8, &ldquo;Siloed Relational Data Partitioning&rdquo;, pp. 201–202</span> In PostgreSQL terms, schema-per-tenant is the idiomatic analogue of his middle grade.</p>
+
+<p><b>What you gain.</b> The isolation argument is unanswerable: the rows are not in this database and the connection does not reach them. Per-tenant backup, restore, encryption key, region and maintenance window all become trivial. One tenant's data volume cannot affect another's query plans.</p>
+<p><b>What you pay.</b> Everything multiplies — migrations, connection pools, monitoring, backup jobs, certificate rotations. Platform-wide questions become fan-out queries across hundreds of databases. And the per-tenant fixed cost is the reason this model cannot serve a long tail of small customers profitably.</p>
+
+<div class="box key"><span class="bt">Siloing is not isolation — a distinction worth its own paragraph</span>
+<p>It is tempting to assume that separating data automatically secures it. Golding is explicit that it does not: siloed constructs may offer no mechanism to define policies preventing cross-tenant access, so data can be siloed and still lack a robust isolation policy.<span class="cite">G ch. 8, p. 202</span> He makes the same point in closing the chapter — siloing storage does not, by itself, isolate that resource.<span class="cite">G ch. 8, &ldquo;Conclusion&rdquo;, p. 218</span></p>
+<p>Concretely: if every service connects to every tenant database with the same superuser credential, you have separate databases and no isolation. The separation only becomes a guarantee when the running process holds credentials that reach one tenant and no other. That is Chapter 10's subject.</p></div>
+
+<h3>9.2 The comparison, across the dimensions that matter</h3>
+<table class="lg">
+<caption>Table 9.1. The three models compared. Read the last two rows first — they decide most real cases.</caption>
+<thead><tr><th style="width:26%">Dimension</th><th style="width:24%">A · Shared table</th><th style="width:24%">B · Schema per tenant</th><th>C · Database per tenant</th></tr></thead>
+<tbody>
+<tr><td>Separation strength</td><td><span class="mid">Logical — policy</span></td><td><span class="mid">Logical — namespace</span></td><td><span class="yes">Physical</span></td></tr>
+<tr><td>Cost per tenant</td><td><span class="yes">Near zero</span></td><td><span class="mid">Low</span></td><td><span class="no">High, fixed</span></td></tr>
+<tr><td>Schema migration</td><td><span class="yes">Once</span></td><td><span class="no">Once per tenant</span></td><td><span class="no">Once per tenant</span></td></tr>
+<tr><td>Onboarding a tenant</td><td><span class="yes">An INSERT</span></td><td><span class="mid">CREATE SCHEMA + DDL</span></td><td><span class="no">Provision infrastructure</span></td></tr>
+<tr><td>Practical ceiling</td><td><span class="yes">100 000+</span></td><td><span class="mid">~1 000 schemas</span></td><td><span class="mid">Ops capacity, not tech</span></td></tr>
+<tr><td>Per-tenant restore</td><td><span class="no">Row extraction</span></td><td><span class="yes">Dump the schema</span></td><td><span class="yes">Restore the database</span></td></tr>
+<tr><td>Per-tenant encryption key</td><td><span class="no">No</span></td><td><span class="no">No</span></td><td><span class="yes">Yes</span></td></tr>
+<tr><td>Deleting a tenant</td><td><span class="no">Ordered multi-table delete</span></td><td><span class="yes">DROP SCHEMA</span></td><td><span class="yes">DROP DATABASE</span></td></tr>
+<tr><td>Noisy-neighbour exposure</td><td><span class="no">Shared everything</span></td><td><span class="no">Shared instance</span></td><td><span class="yes">None</span></td></tr>
+<tr><td>Cross-tenant reporting</td><td><span class="yes">Ordinary SQL</span></td><td><span class="mid">UNION across schemas</span></td><td><span class="no">Fan-out or a warehouse</span></td></tr>
+<tr><td>Blast radius</td><td><span class="no">All tenants</span></td><td><span class="no">All tenants</span></td><td><span class="yes">One tenant</span></td></tr>
+<tr><td><b>Leading failure mode</b></td><td>A forgotten predicate leaks data</td><td>Migration drift between schemas</td><td>Operational load exceeds the team</td></tr>
+<tr><td><b>Choose when</b></td><td><b>By default</b></td><td>You need per-tenant dump/restore but not physical separation</td><td>A regulator, contract or key requirement forces it</td></tr>
+</tbody></table>
+
+<h3>9.3 The decision</h3>
+<p>The recommendation of this document — and of the book — is to <b>start every table pooled, in Model A, with row-level security</b>, and to let individual tenants earn their way out to Model C when something concrete forces it.</p>
+
+<blockquote>
+<p>&ldquo;Generally, in these cases, my recommendation is to default to a pooled model for all the storage in your system. The cost, operational, and agility advantages of pooled storage are often so compelling that teams will cling to the model as long as they can. In this mode, you're essentially forcing any siloed data to earn its way out based on a set of clear requirements that justify taking on the trade-offs that come with managing, operating, and deploying data in a siloed model.&rdquo;</p>
+<p class="src">— Tod Golding, <i>Building Multi-Tenant SaaS Architectures</i>, ch. 8, &ldquo;Defaulting to a Pooled Model&rdquo;, p. 195</p>
+</blockquote>
+
+<p>The phrase to hold on to is <b>earn its way out</b>. Siloing is not a reward for being an important customer; it is a response to a specific requirement you can name. The requirements that genuinely qualify are short and mostly legal:</p>
+<ul class="clean">
+<li>A regulator or contract requires physical separation or data residency in a particular jurisdiction.</li>
+<li>The tenant must hold their own encryption keys.</li>
+<li>The tenant's data volume or traffic distorts shared indexes and shared capacity for everyone else.</li>
+<li>The tenant requires a backup, retention or recovery guarantee that cannot be met from shared storage.</li>
+</ul>
+<p>Notice what is absent: revenue, prestige, and how loudly the customer asked. Those are reasons to <em>price</em> a silo, not reasons to need one.</p>
+
+<h3>9.4 Design so the move stays cheap</h3>
+<figure>{{d:partition-migration}}<figcaption><b>Figure 9.3.</b> Migration paths. A → C is the one you must keep cheap; C → A is the one you should expect never to do.</figcaption></figure>
+
+<p>The recommendation above is only safe if moving a tenant from A to C is genuinely a configuration change. Three properties make that true, and all three must be designed in from the start:</p>
+<dl>
+<dt>The schema is identical in both models</dt>
+<dd>The siloed database carries the <code>tenant_id</code> column too, even though it holds only one tenant and the column is therefore constant. This looks wasteful and is the point: the same migrations, the same queries and the same row-level policies work unchanged in both places. A schema that differs between models means two codebases.</dd>
+<dt>Placement is a data lookup, not a code path</dt>
+<dd>A single nullable column on the tenant record — <code>db_ref</code>, null meaning &ldquo;the shared pool&rdquo; — is read by a connection resolver at the edge of each request. Nothing downstream knows or asks which kind of database it received.</dd>
+<dt>Nothing in business logic branches on tier or placement</dt>
+<dd>The moment a service contains <code>if (tenant.isPremium)</code>, the commercial model and the architecture are welded together, and neither can move without the other.</dd>
+</dl>
+
+<div class="box good"><span class="bt">The test for whether you have this right</span>
+<p>Ask: <b>&ldquo;to move one tenant onto their own database, what would we change?&rdquo;</b></p>
+<p>A sound design answers: provision a database, run the existing migrations, copy the rows matching that tenant, verify the counts, update one column, done — no deployment, no code change. If the answer involves editing application code, you do not have a pooled system with an escape hatch; you have two products that happen to share a repository.</p></div>
+
+<h3>9.5 Things that bite, in every model</h3>
+<dl>
+<dt>Composite keys and indexes</dt>
+<dd>In Model A, nearly every index should lead with <code>tenant_id</code>. An index on <code>(screening_id)</code> alone forces the database to scan across tenants and then discard rows; <code>(tenant_id, screening_id)</code> does not. This single habit accounts for a great deal of the performance difference between pooled systems that work and pooled systems that crawl.</dd>
+<dt>The uniqueness trap</dt>
+<dd>A constraint reading &ldquo;booking references must be unique&rdquo; is almost always wrong in Model A. It should be unique <em>within a tenant</em> — <code>(tenant_id, reference)</code>. Getting it backwards means one tenant's data entry can block another's, which is both a bug and an information leak. Note that this trap disappears in Models B and C, which is part of their appeal.</dd>
+<dt>Cross-tenant aggregates</dt>
+<dd>You will eventually need platform-wide numbers. Do not solve this by relaxing isolation in the application. Emit events to a separate analytics store designed to span tenants, and keep the operational path strict.</dd>
+<dt>The noisy table<span class="cite g2">Citus — Multi-tenant applications</span></dt>
+<dd>One tenant with ten million bookings in a shared table degrades queries for everyone through sheer index size. Native partitioning by <code>tenant_id</code>, or moving that tenant to a silo, are the two honest answers.</dd>
+<dt>Deleting a tenant</dt>
+<dd>In Model C you drop a database. In Model A you must delete from forty tables in dependency order, without locking the system for everyone else, and demonstrate completeness afterwards. Write that job early — regulators ask, and &ldquo;we have never tried&rdquo; is an expensive answer.</dd>
+<dt>Connection pooling and session state<span class="cite g2">PostgreSQL — SET / SET LOCAL</span></dt>
+<dd>Models A and B both set per-request session state — <code>app.tenant_id</code> or <code>search_path</code>. Both must use the transaction-scoped form (<code>SET LOCAL</code>), or a pooled connection will carry one tenant's value into the next tenant's request. This is the single most common source of intermittent, unreproducible cross-tenant bugs.</dd>
+</dl>
+
+<h2><span class="num">10</span>Enforcing Isolation</h2>
+<p class="lede">Having decided where data lives, you must now guarantee the boundary. A guarantee that depends on developers remembering something is not a guarantee.</p>
+
+<p>There are three places to enforce tenant isolation<span class="cite">G ch. 9, &ldquo;The Layers of the Isolation Model&rdquo;, p. 227</span>, and mature systems use more than one.</p>
+
+<h3>Layer 1 — application-enforced<span class="cite">G ch. 9, &ldquo;Application-Enforced Isolation&rdquo;, p. 225</span></h3>
+<p>Every query includes a tenant filter, added by a shared data-access layer rather than by hand. This is necessary, cheap and insufficient on its own: it is enforced by convention, and conventions decay as teams grow.</p>
+
+<h3>Layer 2 — database-enforced</h3>
+<p>The database itself refuses to return rows from other tenants, regardless of what the application asks for. In PostgreSQL this is <b>row-level security</b><span class="cite g2">PostgreSQL — Row Security Policies</span>, and it is the single highest-value control available to a pooled multi-tenant system.</p>
+
+<figure>{{d:rls-mechanism}}<figcaption><b>Figure 10.1.</b> The same buggy query, with and without row-level security. The policy is written once; it then applies to every query, from every code path, forever.</figcaption></figure>
+
+<p>The mechanism<span class="cite g2">Crunchy Data — RLS for tenants in Postgres</span> is worth understanding even if you never write it yourself. You declare, once, a policy on each table: <em>a row is only visible if its <code>tenant_id</code> matches the current session's tenant setting</em>. Each request then sets that session variable from the verified token. From that point, the database transparently adds the condition to every query — including the ones your developers forgot to filter, including the ones written by a reporting tool, including the ones typed by an engineer at 2 a.m. during an incident.</p>
+
+<div class="box warn"><span class="bt">Two ways teams get RLS wrong</span>
+<p><b>Connecting as the table owner.</b> In PostgreSQL, table owners and superusers bypass row-level security by default. A system that enables RLS but connects as the owner has a policy that does nothing at all, and a test suite that will happily confirm everything is fine. Your application must connect as a restricted role — and you should write a test that <em>proves</em> the policy blocks a cross-tenant read.</p>
+<p><b>Using <code>SET</code> instead of <code>SET LOCAL</code>.</b> With connection pooling, a plain <code>SET</code> persists on the connection after the request ends. The next request — possibly for a different tenant — inherits it. <code>SET LOCAL</code> is scoped to the transaction and is the only safe form.</p></div>
+
+<h3>Layer 3 — infrastructure-enforced<span class="cite">G ch. 9, &ldquo;Application Isolation Versus Infrastructure Isolation&rdquo;, p. 226</span></h3>
+<p>The strongest form<span class="cite g2">AWS — SaaS Tenant Isolation Strategies</span>, available when resources are siloed: the running process is issued credentials that only reach one tenant's resources. Even a fully compromised application cannot cross the boundary, because the credentials it holds do not open the other doors. Network policies<span class="cite g2">Kubernetes — Network Policies</span> that prevent pooled workloads from even resolving a siloed database are the same idea applied to the network.</p>
+
+<table>
+<thead><tr><th style="width:24%">Layer</th><th style="width:22%">Stops</th><th style="width:24%">Does not stop</th><th>Cost to adopt</th></tr></thead>
+<tbody>
+<tr><td>Application filter</td><td>Ordinary mistakes</td><td>A forgotten filter; SQL injection</td><td>Very low</td></tr>
+<tr><td>Row-level security</td><td>Forgotten filters; most injection; ad-hoc queries</td><td>A compromised process that can set the session variable itself</td><td>Low — and the best value available</td></tr>
+<tr><td>Scoped credentials</td><td>A fully compromised process</td><td>Nothing much, but requires siloed resources</td><td>High; only where warranted</td></tr>
+</tbody></table>
+
+<div class="box good"><span class="bt">If you take one action from this document</span>
+<p>Turn on row-level security for every tenant-scoped table, from the very first migration. It costs an afternoon at the start of a project and is close to impossible to retrofit convincingly once there is production data and two hundred query sites.</p></div>
+
+<h2><span class="num">11</span>Noisy Neighbours</h2>
+<p class="lede">The failure mode that does not exist in single-tenant systems, and that customers find hardest to forgive — because from their side, nothing they did caused it.</p>
+
+<figure>{{d:noisy-neighbor}}<figcaption><b>Figure 11.1.</b> One tenant's blockbuster consuming the shared capacity that three others are quietly depending on.</figcaption></figure>
+
+<p>Nyati Cinemas releases tickets for a major opening at six o'clock on a Friday. Forty thousand requests a minute arrive. The servers, the database connections and the cache are all shared. Prestige Screens, doing their ordinary trade at eighty requests a minute, find their box office has become unusable.</p>
+<p>Prestige did nothing wrong, cannot see what is happening, and will phone support.<span class="cite">G ch. 7, &ldquo;Addressing Noisy Neighbor&rdquo;, p. 162</span> This is what you have bought with pooling, and it must be designed for rather than discovered.</p>
+
+<h3>The four defences</h3>
+<dl>
+<dt>1 · Per-tenant rate limits</dt>
+<dd>The foundation. Each tenant gets a request budget — generous, burstable, but bounded. A tenant that exceeds it is throttled rather than allowed to consume everyone's headroom. Tie the budget to the tenant's tier and you have turned a technical control into a product feature.</dd>
+<dt>2 · Fair queueing</dt>
+<dd>When work queues up, process it round-robin <em>across tenants</em> rather than first-come-first-served. Under a flood from one tenant, strict FIFO means everyone else's work sits behind forty thousand items. Round-robin means a small tenant's request waits behind one item from each active tenant.</dd>
+<dt>3 · Resource caps</dt>
+<dd>Limit what any single tenant can hold at once: database connections, worker concurrency, in-flight requests. This prevents the specific failure where one tenant exhausts the connection pool and every other tenant sees errors that look like a total outage.</dd>
+<dt>4 · Move them out</dt>
+<dd>When a tenant is permanently, structurally larger than the others, stop fighting it. Give them dedicated resources — and charge for them. A bridge model exists precisely for this case.</dd>
+</dl>
+
+<div class="box note"><span class="bt">The prerequisite everyone skips</span>
+<p>None of these defences can be operated without per-tenant visibility. If your dashboard says &ldquo;p99 latency: 2.1 s&rdquo; with no tenant dimension, you know something is wrong and have no way to find out who is causing it or who is suffering. Tenant-labelled metrics are not a reporting nicety; they are the instrument panel for every control in this chapter.</p></div>
+
+<h2><span class="num">12</span>Blast Radius</h2>
+<p class="lede">When — not if — something breaks, how many tenants find out?</p>
+
+<figure>{{d:blast-radius}}<figcaption><b>Figure 12.1.</b> The same failure under three deployment models. The radius is chosen in advance, by architecture, and paid for in infrastructure.</figcaption></figure>
+
+<p>Blast radius<span class="cite">G ch. 8, &ldquo;Blast Radius&rdquo;, p. 193</span> is the honest accounting of what you bought when you pooled. A bad deployment, a corrupted migration, a poisoned cache or an exhausted connection pool affects everyone sharing the resource — and in a fully pooled system, that is every customer you have.</p>
+<p>The useful reframing is that blast radius is not a fact about your architecture; it is a <b>target you set</b>, and then build to meet. Reasonable targets sound like: <em>no single failure may affect more than 20% of tenants</em>, or <em>Dedicated-tier tenants must be unaffected by failures originating in the shared pool.</em> Those sentences translate directly into pods, tier-based siloing, and network policy.</p>
+
+<h3>Reducing it without siloing everything</h3>
+<ul class="clean">
+<li><b>Deploy progressively.</b><span class="cite g2">MS — Deployment and configuration</span> Release to a small group of tenants first and watch their error rates before continuing. A bad release caught at 2% of tenants is an incident; the same release at 100% is an outage.</li>
+<li><b>Degrade rather than fail.</b> If the recommendation service is down, show the film list without recommendations. Partial service across all tenants often beats total failure for some.</li>
+<li><b>Isolate the failure domains you can name.</b> Seat holding, payment and reporting have completely different reliability requirements. Reporting should never be able to take down booking — which means it should not share a connection pool with it.</li>
+<li><b>Make tenant-level recovery possible.</b> When one tenant's data is corrupted by a bad job, can you restore just that tenant? In a siloed model, yes. In a pooled model, only if you designed for it — which usually means an append-only event log alongside the mutable state.</li>
+</ul>
+
+<div class="part">
+  <div class="pn">Part IV</div>
+  <h2>Running It</h2>
+  <p>A multi-tenant system is not finished when it works. It is finished when you can onboard a customer without an engineer, tell which tenant is costing you money, and sell four service levels from one codebase.</p>
+</div>
+
+<h2 class="cont"><span class="num">13</span>Onboarding and the Tenant Lifecycle</h2>
+<p class="lede">Onboarding is the most underrated feature in any SaaS product. It is also the only part of the system that touches every other part.</p>
+
+<figure>{{d:onboarding-flow}}<figcaption><b>Figure 13.1.</b> Turning a signature into a working tenant. The interesting engineering is not in the happy path — it is in step 4 failing half-way.</figcaption></figure>
+
+<p>Onboarding<span class="cite">G ch. 4, &ldquo;The Onboarding Experience&rdquo;, pp. 88&ndash;99</span> is the process that turns &ldquo;Prestige Screens has signed&rdquo; into &ldquo;Prestige Screens is logged in and configuring their first theatre&rdquo;. In a mature system it takes seconds and involves no human being.</p>
+
+<div class="box key"><span class="bt">The line that separates SaaS from hosting</span>
+<p>If adding a customer requires an engineer to run a script, edit a configuration file, or provision anything by hand, you do not yet have a SaaS business — you have a hosting business with a subscription price. Automated onboarding is the thing that makes the economics of Chapter 1 real.</p></div>
+
+<h3>Why it is harder than it looks</h3>
+<p>Onboarding is the one workflow that spans identity, billing, data, infrastructure and permissions at once. It is therefore the workflow with the most ways to fail half-finished — and a tenant left half-created is worse than one never created, because it appears to exist.</p>
+<p>Treat onboarding as an explicit state machine, not a function: <code>PENDING → PROVISIONING → ACTIVE</code>, with <code>FAILED</code> reachable from the middle and both retry and rollback paths defined. Record every resource you create as you create it<span class="cite">G ch. 4, &ldquo;Tracking Onboarded Resources&rdquo;, p. 97; &ldquo;Handling Onboarding Failures&rdquo;, p. 98</span>, so that undoing a partial onboarding is a matter of reading a list rather than guessing.</p>
+
+<h3>The lifecycle does not end at ACTIVE</h3>
+<table>
+<thead><tr><th style="width:22%">Transition</th><th style="width:34%">What must actually happen</th><th>Where teams get it wrong</th></tr></thead>
+<tbody>
+<tr><td><b>Activate</b></td><td>Tenant becomes usable; users can log in</td><td>Forgetting to seed default roles, so the first admin cannot grant access to anyone</td></tr>
+<tr><td><b>Change tier</b></td><td>Limits, features and possibly data location change</td><td>Cached tokens still carry the old tier for their full lifetime</td></tr>
+<tr><td><b>Suspend</b></td><td>Access blocked, data retained, billing paused</td><td>Suspending logins but leaving background jobs and webhooks running</td></tr>
+<tr><td><b>Migrate pool → silo</b></td><td>Data moved to dedicated storage, config repointed</td><td>Treating it as a one-off manual project instead of a supported operation</td></tr>
+<tr><td><b>Offboard</b></td><td>Data exported, then provably deleted within the contracted window</td><td>Never being built at all, then being needed urgently and legally</td></tr>
+</tbody></table>
+
+<div class="box good"><span class="bt">A practice worth adopting on day one</span>
+<p>Onboard a throwaway tenant automatically on every deployment, exercise it, and delete it.<span class="cite">G ch. 4, &ldquo;Testing Your Onboarding Experience&rdquo;, p. 99</span> Because onboarding touches identity, data, infrastructure and permissions in one pass, it is the single most informative smoke test a multi-tenant system can have. If onboarding works, a great deal else is provably wired up correctly.</p></div>
+
+<h2><span class="num">14</span>Tenant-Aware Operations</h2>
+<p class="lede">In a single-tenant system you ask &ldquo;is it up?&rdquo;. In a multi-tenant system that question has no useful answer. The real question is &ldquo;up <em>for whom</em>?&rdquo;</p>
+
+<figure>{{d:observability}}<figcaption><b>Figure 14.1.</b> The same three signals, with and without tenant attribution. Only one of these lets you answer a customer's phone call.</figcaption></figure>
+
+<p>A dashboard showing 99.95% availability can conceal a tenant who has been at 60% all week.<span class="cite">G ch. 12, &ldquo;Multi-Tenant Operational Metrics&rdquo;, p. 310</span> Averages across tenants are actively misleading, because they are dominated by whoever generates the most traffic — which is precisely the tenant least likely to be suffering.</p>
+
+<h3>What to instrument</h3>
+<ul class="clean">
+<li><b>Every log line</b><span class="cite">G ch. 12, &ldquo;Tenant-Aware Logs&rdquo;, p. 329</span> carries <code>tenant_id</code>, injected by the same interceptor that establishes tenant context — never added by hand at call sites.</li>
+<li><b>Every metric</b> carries tenant as a label rather than being split into per-tenant metrics. Watch cardinality: fifty thousand tenants multiplied by twenty metrics will overwhelm most time-series databases, so label the largest tenants individually and bucket the long tail.</li>
+<li><b>Every trace</b> carries tenant as a root-span attribute, propagated downstream, so you can replay one chain's bad Friday night end to end.</li>
+<li><b>Consumption</b> — requests, storage, compute time — is recorded per tenant. This feeds both billing and the cost model in the next chapter.</li>
+</ul>
+
+<div class="box warn"><span class="bt">What must never be in a log line</span>
+<p>Tenant identifiers, yes. Customer names, seat holders, card details and e-mail addresses, no. Logs are the least-protected copy of your data and the most widely readable by your own staff. In a multi-tenant system they are also the easiest place to accidentally pool information that the architecture has spent considerable effort separating.</p></div>
+
+<h3>The dashboards that actually get used</h3>
+<p>Three views, for three different people, all from the same data:</p>
+<div class="grid3">
+<div class="card"><h5>Operator view</h5><p>Health per tenant, ranked by degradation. Answers: <em>who is having a bad time right now, and are they on a tier that entitles them to my attention?</em></p></div>
+<div class="card"><h5>Commercial view</h5><p>Consumption and cost per tenant against revenue. Answers: <em>who is unprofitable, and who is about to outgrow their plan?</em></p></div>
+<div class="card"><h5>Tenant's own view</h5><p>Their usage, their limits, their occupancy. Answers their questions before they become support tickets — and quietly justifies the next tier up.</p></div>
+</div>
+
+<h2><span class="num">15</span>Tiering</h2>
+<p class="lede">Tiers are where architecture meets the price list. Done well, they let one codebase serve a one-screen cinema and a national chain. Done badly, they fork your product.</p>
+
+<figure>{{d:tiering-ladder}}<figcaption><b>Figure 15.1.</b> Four tiers, one codebase. Every difference between these columns is a configuration value read at runtime — not a branch in the source.</figcaption></figure>
+
+<p>A tier<span class="cite">G ch. 14, &ldquo;Tiering Patterns&rdquo;, pp. 364&ndash;371</span> is a named bundle that maps a commercial promise onto technical behaviour. The important discipline is that the <em>only</em> thing that varies between tiers is configuration: limits, quotas, feature flags, and which connection the tenant's requests are routed to.</p>
+
+<div class="box key"><span class="bt">The test for a healthy tier design</span>
+<p>Ask: <b>if we added a fifth tier tomorrow, how much code would change?</b></p>
+<p>If the answer is &ldquo;a configuration row and a pricing page&rdquo;, the design is sound. If it is &ldquo;a sprint&rdquo;, then tier logic has leaked into business logic, and every future feature will need to be built and tested four times. This is one of the few places where the cost of getting it wrong compounds silently for a year before anyone notices.</p></div>
+
+<h3>What tiers are usefully built from<span class="cite g2">MS — Pricing models</span></h3>
+<table>
+<thead><tr><th style="width:26%">Dimension</th><th style="width:30%">Example</th><th>Note</th></tr></thead>
+<tbody>
+<tr><td>Consumption limits</td><td>Requests per minute; theatres; seats sold per month</td><td>Easiest to implement, easiest for customers to understand</td></tr>
+<tr><td>Features</td><td>Loyalty programmes, dynamic pricing, API access</td><td>Keep behind flags read from tenant config, never from code branches</td></tr>
+<tr><td>Isolation</td><td>Dedicated database above a certain tier</td><td>The most defensible reason to charge substantially more</td></tr>
+<tr><td>Support and SLA</td><td>48-hour e-mail versus one-hour phone</td><td>Mostly organisational, but it should appear in your alert routing</td></tr>
+<tr><td>Data retention</td><td>7, 30 or 90 days of history and backups</td><td>Directly tied to real storage cost, so it prices honestly</td></tr>
+</tbody></table>
+
+<h3>Throttling without losing the customer</h3>
+<p>A tenant who hits their limit should encounter a clear, honest boundary, not a mysterious failure.<span class="cite">G ch. 14, &ldquo;Throttling and Tenant Experience&rdquo;, p. 381</span> Return a precise status code, say which limit was reached, say when it resets, and — if the tenant is close to their ceiling regularly — tell their administrator before they hit it. A rate limit that arrives as an unexplained error is a support ticket; the same limit, explained, is an upgrade conversation.</p>
+
+<h2><span class="num">16</span>Cost Per Tenant</h2>
+<p class="lede">The metric that decides whether you have a business, and the one almost nobody has when they first need it.</p>
+
+<figure>{{d:cost-per-tenant}}<figcaption><b>Figure 16.1.</b> A cloud invoice is a single number. Attribution turns it into a set of decisions.</figcaption></figure>
+
+<p>Your cloud provider sends one bill.<span class="cite">G ch. 12, &ldquo;Cost-per-Tenant Metrics&rdquo;, p. 318</span> It cannot tell you which tenants earned it, and it never will. Without attribution you cannot answer whether your free tier is sustainable, whether a particular customer is profitable, or whether a discount you are about to offer is above or below cost.</p>
+
+<h3>How to get it</h3>
+<p>Siloed resources<span class="cite g2">MS — Measure consumption</span> are straightforward: tag the infrastructure with the tenant and read the bill back. Pooled resources — the majority — require proxies. Count requests, storage bytes and compute-milliseconds per tenant, then apportion the shared bill in proportion to consumption.</p>
+<p>The result is an estimate, and that is fine. A cost model accurate to within 20% transforms pricing conversations; the perfect model that is never built helps nobody.</p>
+
+<div class="box note"><span class="bt">What the number is really for</span>
+<p>Cost per tenant is not an accounting exercise — it is the feedback loop that keeps architecture and commerce honest with each other. It is what tells you that your cheapest tier is being used by tenants who consume like your most expensive one, that a &ldquo;strategic&rdquo; customer is losing you money on every booking, or that siloing one demanding tenant would be cheaper than the capacity you are holding in reserve for their spikes. Without it, every one of those judgements is a guess wearing a confident expression.</p></div>
+
+<div class="part">
+  <div class="pn">Part V</div>
+  <h2>Judgement</h2>
+  <p>What goes wrong, how to tell whether a design is sound, and where to read further. This part is written to be used rather than read — return to it when you are reviewing a design.</p>
+</div>
+
+<h2 class="cont"><span class="num">17</span>The Failure Catalogue</h2>
+<p class="lede">Multi-tenant systems fail in a small number of recognisable ways. Nearly every one of them is cheap to prevent at design time and expensive to fix afterwards.</p>
+
+<h3>The severe ones</h3>
+<dl>
+<dt>Tenant identity taken from the request</dt>
+<dd><b>What it looks like:</b> the tenant is read from a URL path, a header or a body field.<br>
+<b>Why it happens:</b> it is convenient during development, when there is no real login yet, and nobody revisits it.<br>
+<b>Consequence:</b> any authenticated user can read any tenant's data by editing a string.<br>
+<b>Prevention:</b> extract tenant identity from the verified token only, in one interceptor; reject requests without the claim rather than defaulting.</dd>
+
+<dt>Isolation enforced only in application code</dt>
+<dd><b>What it looks like:</b> every query has a tenant filter, added by hand, and reviewers check for it.<br>
+<b>Why it happens:</b> it works perfectly with three developers, and the failure is silent.<br>
+<b>Consequence:</b> the first forgotten filter is a breach, and it will pass review because it looks entirely normal.<br>
+<b>Prevention:</b> row-level security underneath the application, plus a test that proves a cross-tenant read returns nothing.</dd>
+
+<dt>Tenancy retrofitted after launch</dt>
+<dd><b>What it looks like:</b> &ldquo;we will add <code>tenant_id</code> when we get our second customer.&rdquo;<br>
+<b>Why it happens:</b> it genuinely is faster for the first few months.<br>
+<b>Consequence:</b> re-partitioning live data, rewriting every query and re-issuing every credential — typically a quarter of work, under pressure, with customers watching.<br>
+<b>Prevention:</b> tenancy in the first migration, even with one tenant. The cost then is close to zero.</dd>
+
+<dt>The tenant boundary drawn in the wrong place</dt>
+<dd><b>What it looks like:</b> making each theatre a tenant, when chain administrators need to see across theatres.<br>
+<b>Consequence:</b> the product spends its life fighting its own security model, and every cross-boundary report is a deliberate hole.<br>
+<b>Prevention:</b> ask &ldquo;what is the largest group who must see each other's data?&rdquo; before the first table exists.</dd>
+
+<dt>Session state leaking between tenants</dt>
+<dd><b>What it looks like:</b> a pooled database connection retaining a tenant setting from a previous request; a cache key without a tenant prefix.<br>
+<b>Why it happens:</b> connection pools and caches are shared by design, and the leak is invisible until it is not.<br>
+<b>Consequence:</b> intermittent, unreproducible cross-tenant reads — the worst class of bug to diagnose.<br>
+<b>Prevention:</b> transaction-scoped settings (<code>SET LOCAL</code>); tenant prefixes on every cache key, applied by the cache client rather than by callers.</dd>
+</dl>
+
+<h3>The expensive ones</h3>
+<dl>
+<dt>Tier logic inside business logic</dt>
+<dd>Conditional branches on tier scattered through services. Every feature then needs building and testing once per tier. Keep tier differences in configuration read at runtime.</dd>
+
+<dt>Metrics without a tenant dimension</dt>
+<dd>You can see that something is wrong and never who. Every noisy-neighbour control in Chapter 11 depends on this data existing.</dd>
+
+<dt>Indexes that do not lead with the tenant</dt>
+<dd>The database scans across all tenants and discards. Perfectly correct, quietly ruinous, and it worsens precisely as you succeed.</dd>
+
+<dt>Manual onboarding</dt>
+<dd>Each new customer consumes engineering time. Growth is capped by your team's calendar rather than by demand.</dd>
+
+<dt>No offboarding path</dt>
+<dd>Deleting one tenant from shared tables, completely and provably, is difficult to build and impossible to improvise. It is also contractually required more often than teams expect.</dd>
+
+<dt>Background jobs without tenant context</dt>
+<dd>Workers have no incoming request to derive context from. A nightly job that iterates &ldquo;all bookings&rdquo; without scoping is a breach waiting for a report to be e-mailed to the wrong chain.</dd>
+</dl>
+
+<h2><span class="num">18</span>Decision Checklists</h2>
+<p class="lede">Use these when reviewing a design — yours or someone else's. They are ordered so that a &ldquo;no&rdquo; near the top matters far more than a &ldquo;no&rdquo; near the bottom.</p>
+
+<h3>Before the first line of code</h3>
+<ul class="check">
+<li>We can state precisely what our tenant is, and why the boundary sits there rather than one level up or down.</li>
+<li>We know whether one person may belong to two tenants, and what happens if they do.</li>
+<li>Every table in the initial schema carries <code>tenant_id</code> — including the ones where it seems redundant.</li>
+<li>We know which resources start pooled and what specific evidence would move one to a silo.</li>
+<li>The control plane is a separate application from the application plane, with separate credentials.</li>
+</ul>
+
+<h3>Isolation</h3>
+<ul class="check">
+<li>Tenant context is established in exactly one place: from the verified token for staff, from the resource for consumers — never from a caller-supplied tenant claim.</li>
+<li>A request to a tenant-scoped endpoint without a tenant claim is rejected, never defaulted.</li>
+<li>A consumer token cannot reach a staff endpoint, and a staff token cannot reach a consumer endpoint. Both are 403 and both are logged.</li>
+<li>Any cross-tenant table — a platform consumer identity, a shared catalogue — is written down, reachable through exactly one service, and never joined to from tenant-scoped code.</li>
+<li>Row-level security is enabled on every tenant-scoped table, and the application connects as a non-owner role.</li>
+<li>There is an automated test that attempts a cross-tenant read and asserts it returns nothing.</li>
+<li>Cache keys, object-storage paths, queue messages and search indexes are all tenant-prefixed.</li>
+<li>Background jobs and webhook handlers establish tenant context explicitly from their payload.</li>
+</ul>
+
+<h3>Operations</h3>
+<ul class="check">
+<li>Every log line, metric and trace carries a tenant label — injected centrally, not at call sites.</li>
+<li>We can answer &ldquo;is the system healthy for tenant X?&rdquo; without writing a query by hand.</li>
+<li>Per-tenant rate limits exist and are driven by tier.</li>
+<li>Onboarding is fully automated, is a state machine, and runs as a smoke test on every deploy.</li>
+<li>We can suspend, export and completely delete a single tenant.</li>
+<li>We have an estimate of cost per tenant, even a rough one.</li>
+</ul>
+
+<h3>Questions a non-technical reviewer can ask</h3>
+<p>These five questions, asked of any engineering team, reliably distinguish a considered design from an optimistic one.</p>
+<ol>
+<li><b>&ldquo;If a developer forgets to filter by customer in one query, what stops the leak?&rdquo;</b> — A good answer names a mechanism below the application. &ldquo;Code review&rdquo; is not an answer.</li>
+<li><b>&ldquo;If our largest customer has their biggest day, what happens to the smallest?&rdquo;</b> — Look for rate limits and fair queueing, not reassurance.</li>
+<li><b>&ldquo;How long does it take to add a customer, and who has to be awake?&rdquo;</b> — Seconds and nobody, or you have a scaling ceiling made of people.</li>
+<li><b>&ldquo;What does it cost us to serve our cheapest customer?&rdquo;</b> — If nobody knows, pricing is guesswork.</li>
+<li><b>&ldquo;A customer leaves and demands deletion within 30 days. Walk me through it.&rdquo;</b> — Hesitation here is a contractual problem, not a technical one.</li>
+</ol>
+
+<h2><span class="num">19</span>References</h2>
+<p class="lede">This document is a guided tour. The works below are the territory. The primary source is on your shelf already; everything else is freely available online.</p>
+
+<h3>19.1 The citation convention used here</h3>
+<p>Two kinds of citation marker appear in this document.</p>
+<p><span class="cite">G ch. 8, p. 195</span> — amber, refers to the primary source below, by chapter and printed page number. Page numbers are those printed in the book, not PDF positions.</p>
+<p><span class="cite g2">MS — Tenancy models</span> — blue, refers to a freely available online article, listed in full in Chapter 20. The marker carries the publisher and title so you can find it without turning to the list.</p>
+<ul class="refs">
+<li><span class="t">Tod Golding — <i>Building Multi-Tenant SaaS Architectures: Principles, Practices, and Patterns for Designing Multi-Tenant Solutions</i></span>
+<span class="w">O'Reilly Media, 1st edition, May 2024. ISBN 978-1-098-14064-9. 486 pages, 17 chapters.<br>
+The reference work in this field, and the source of the silo / pool / bridge vocabulary, the control-plane / application-plane split, and the &ldquo;default to pooled&rdquo; guidance this document adopts. Examples are written against AWS; the concepts are not AWS-specific.</span></li>
+</ul>
+
+<h3>19.2 The book, chapter by chapter</h3>
+<p>A map of the whole volume, so you can navigate directly to what you need.</p>
+<table>
+<caption>Table 19.1. <i>Building Multi-Tenant SaaS Architectures</i> — full contents with starting pages</caption>
+<thead><tr><th style="width:6%">Ch</th><th style="width:8%">Page</th><th style="width:34%">Title</th><th>What it is for</th></tr></thead>
+<tbody>
+<tr><td class="c">1</td><td class="c">1</td><td>The SaaS Mindset</td><td>Why SaaS is a business model before it is an architecture. Read first if you are persuading anyone.</td></tr>
+<tr><td class="c">2</td><td class="c">23</td><td>Multi-Tenant Architecture Fundamentals</td><td>The two planes, tenant context, isolation, partitioning, routing — the whole vocabulary in one chapter.</td></tr>
+<tr><td class="c">3</td><td class="c">47</td><td>Multi-Tenant Deployment Models</td><td>Full-stack silo, full-stack pool, mixed mode, pods. The deployment decision in full.</td></tr>
+<tr><td class="c">4</td><td class="c">81</td><td>Onboarding and Identity</td><td>Automated onboarding, custom claims, and <i>&ldquo;Tenant Authentication Is Not Tenant Isolation&rdquo;</i> (p. 111).</td></tr>
+<tr><td class="c">5</td><td class="c">115</td><td>Tenant Management</td><td>The tenant service, configuration, lifecycle, tier changes, decommissioning.</td></tr>
+<tr><td class="c">6</td><td class="c">137</td><td>Tenant Authentication and Routing</td><td>Tenant domains versus a single domain; routing authenticated tenants.</td></tr>
+<tr><td class="c">7</td><td class="c">157</td><td>Building Multi-Tenant Services</td><td>Noisy neighbour, extracting tenant context, and the interception patterns (aspects, sidecars, middleware).</td></tr>
+<tr><td class="c">8</td><td class="c">189</td><td>Data Partitioning</td><td><b>The chapter behind our Chapter 9.</b> Pooled and siloed across relational, NoSQL, object and search stores.</td></tr>
+<tr><td class="c">9</td><td class="c">219</td><td>Tenant Isolation</td><td>Isolation models, the layers, deployment-time versus runtime, policy management.</td></tr>
+<tr><td class="c">10</td><td class="c">245</td><td>EKS (Kubernetes) SaaS</td><td>Pooled and siloed namespaces, Helm-driven onboarding, node selection. Closest to our deployment section.</td></tr>
+<tr><td class="c">11</td><td class="c">277</td><td>Serverless SaaS</td><td>Lambda-based patterns, dynamic isolation injection, concurrency and noisy neighbour.</td></tr>
+<tr><td class="c">12</td><td class="c">307</td><td>Tenant-Aware Operations</td><td>Metrics, cost-per-tenant (p. 318), tenant-aware logs, operations consoles.</td></tr>
+<tr><td class="c">13</td><td class="c">337</td><td>SaaS Migration Strategies</td><td>Moving an existing single-tenant product: lift-and-shift, layered, service-by-service.</td></tr>
+<tr><td class="c">14</td><td class="c">363</td><td>Tiering Strategies</td><td>Consumption, value and deployment-focused tiering; API, compute and storage tiering; throttling.</td></tr>
+<tr><td class="c">15</td><td class="c">385</td><td>SaaS Anywhere</td><td>Running a SaaS control plane over tenant-hosted or on-premises environments.</td></tr>
+<tr><td class="c">16</td><td class="c">403</td><td>GenAI and Multi-Tenancy</td><td>Tenant isolation applied to models, embeddings and vector stores. Newer territory.</td></tr>
+<tr><td class="c">17</td><td class="c">431</td><td>Guiding Principles</td><td>A short closing synthesis. Worth reading early, despite its position.</td></tr>
+</tbody></table>
+
+<h3>19.3 From this masterclass to the book</h3>
+<table class="lg">
+<thead><tr><th style="width:44%">If you want to go deeper on…</th><th style="width:12%">Here</th><th>In Golding</th></tr></thead>
+<tbody>
+<tr><td>Why SaaS is a business model, not a deployment style</td><td>Ch. 1</td><td>Ch. 1 (p. 1)</td></tr>
+<tr><td>Control plane and application plane</td><td>Ch. 5</td><td>Ch. 2, p. 27</td></tr>
+<tr><td>Silo, pool, bridge, pods, mixed mode</td><td>Ch. 8</td><td>Ch. 3, pp. 51, 75, 77</td></tr>
+<tr><td>Tenant context and interception</td><td>Ch. 6</td><td>Ch. 2, p. 34; ch. 7, pp. 172, 183</td></tr>
+<tr><td>Routing and authentication flows</td><td>Ch. 6</td><td>Ch. 6, pp. 138–149</td></tr>
+<tr><td>Authentication is not isolation</td><td>Ch. 7</td><td>Ch. 4, p. 111</td></tr>
+<tr><td><b>The three data partitioning models</b></td><td><b>Ch. 9</b></td><td><b>Ch. 8, pp. 195–202</b></td></tr>
+<tr><td>Enforcing isolation; the layers</td><td>Ch. 10</td><td>Ch. 9, pp. 225–232</td></tr>
+<tr><td>Noisy neighbour</td><td>Ch. 11</td><td>Ch. 7, p. 162</td></tr>
+<tr><td>Blast radius</td><td>Ch. 12</td><td>Ch. 8, p. 193</td></tr>
+<tr><td>Onboarding and the tenant lifecycle</td><td>Ch. 13</td><td>Ch. 4, pp. 88–99; ch. 5</td></tr>
+<tr><td>Tenant-aware operations and cost per tenant</td><td>Ch. 14, 16</td><td>Ch. 12, pp. 310, 318</td></tr>
+<tr><td>Tiering</td><td>Ch. 15</td><td>Ch. 14, pp. 364–381</td></tr>
+<tr><td>Kubernetes and serverless realisations</td><td>—</td><td>Ch. 10, 11</td></tr>
+<tr><td>Migrating an existing single-tenant product</td><td>—</td><td>Ch. 13</td></tr>
+<tr><td>Multi-tenancy for AI features</td><td>—</td><td>Ch. 16</td></tr>
+</tbody></table>
+
+<div class="box book"><span class="bt">One difference worth noting</span>
+<p><em>Golding's examples are written against AWS — Cognito, API Gateway, Lambda, DynamoDB, EKS. This document is deliberately vendor-neutral, and the companion PRD uses PostgreSQL, Redis and Kubernetes. The concepts map cleanly; only the product names change. Where he uses IAM-scoped credentials for runtime isolation, we use PostgreSQL row-level security and Kubernetes network policies to reach the same guarantee.</em></p></div>
+
+<h2><span class="num">20</span>Further Reading</h2>
+<p class="lede">Freely available material that complements the book. All links were checked on 22 September 2026; vendor documentation moves, so search the title if a link has rotted.</p>
+
+<h3>20.1 Start here — the two best free guides</h3>
+<ul class="refs">
+<li><span class="t">Microsoft — Architecting multitenant solutions on Azure</span>
+<span class="w">The most complete free treatment of multi-tenancy in existence, and largely cloud-neutral in its reasoning. Start with <i>Tenancy models</i>, then <i>Architectural approaches for storage and data</i>, which covers exactly the three models in our Chapter 9.</span>
+<a class="u" href="https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/overview">learn.microsoft.com/en-us/azure/architecture/guide/multitenant/overview</a>
+<a class="u" href="https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/tenancy-models">learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/tenancy-models</a>
+<a class="u" href="https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/approaches/storage-data">learn.microsoft.com/en-us/azure/architecture/guide/multitenant/approaches/storage-data</a></li>
+
+<li><span class="t">Microsoft — the rest of the multitenant series, by topic</span>
+<span class="w">Individually short and worth reading alongside the matching chapter here. Identity (our ch. 7), mapping requests to tenants (ch. 6), deployment and configuration (ch. 12), measuring consumption (ch. 16), pricing models (ch. 15).</span>
+<a class="u" href="https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/identity">learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/identity</a>
+<a class="u" href="https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/map-requests">learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/map-requests</a>
+<a class="u" href="https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/approaches/deployment-configuration">learn.microsoft.com/en-us/azure/architecture/guide/multitenant/approaches/deployment-configuration</a>
+<a class="u" href="https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/measure-consumption">learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/measure-consumption</a>
+<a class="u" href="https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/pricing-models">learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/pricing-models</a>
+</li>
+
+<li><span class="t">AWS — SaaS Lens, AWS Well-Architected Framework</span>
+<span class="w">The structured review checklist that pairs with Golding's book — he was closely involved in AWS's SaaS guidance. Use it as an audit instrument once you have a design.</span>
+<a class="u" href="https://docs.aws.amazon.com/wellarchitected/latest/saas-lens/saas-lens.html">docs.aws.amazon.com/wellarchitected/latest/saas-lens/saas-lens.html</a></li>
+</ul>
+
+<h3>20.2 Tenant isolation and partitioning</h3>
+<ul class="refs">
+<li><span class="t">AWS — SaaS Tenant Isolation Strategies (whitepaper)</span>
+<span class="w">The single best free document on isolation enforcement specifically. Directly supports our Chapter 10.</span>
+<a class="u" href="https://docs.aws.amazon.com/whitepapers/latest/saas-tenant-isolation-strategies/saas-tenant-isolation-strategies.html">docs.aws.amazon.com/whitepapers/latest/saas-tenant-isolation-strategies/saas-tenant-isolation-strategies.html</a></li>
+<li><span class="t">AWS — SaaS Architecture Fundamentals (whitepaper)</span>
+<span class="w">A shorter, free overview of the same conceptual model as the book. Good for handing to a stakeholder.</span>
+<a class="u" href="https://docs.aws.amazon.com/whitepapers/latest/saas-architecture-fundamentals/saas-architecture-fundamentals.html">docs.aws.amazon.com/whitepapers/latest/saas-architecture-fundamentals/saas-architecture-fundamentals.html</a></li>
+<li><span class="t">Microsoft — Multi-tenant SaaS database tenancy patterns (Azure SQL)</span>
+<span class="w">Walks through database-per-tenant, sharded multi-tenant and hybrid with real operational detail on migration and management.</span>
+<a class="u" href="https://learn.microsoft.com/en-us/azure/azure-sql/database/saas-tenancy-app-design-patterns">learn.microsoft.com/en-us/azure/azure-sql/database/saas-tenancy-app-design-patterns</a></li>
+<li><span class="t">Google Cloud — Multi-tenancy overview (GKE)</span>
+<span class="w">Cluster and namespace multi-tenancy, resource quotas and network policy — the Kubernetes side of our deployment topology.</span>
+<a class="u" href="https://cloud.google.com/kubernetes-engine/docs/concepts/multitenancy-overview">cloud.google.com/kubernetes-engine/docs/concepts/multitenancy-overview</a></li>
+</ul>
+
+<h3>20.3 PostgreSQL specifics</h3>
+<ul class="refs">
+<li><span class="t">PostgreSQL — Row Security Policies</span>
+<span class="w">The primary documentation for the mechanism our Chapter 10 rests on. Read the notes on table owners and <code>FORCE ROW LEVEL SECURITY</code> carefully — that is where teams go wrong.</span>
+<a class="u" href="https://postgresql.org/docs/current/ddl-rowsecurity.html">postgresql.org/docs/current/ddl-rowsecurity.html</a>
+<a class="u" href="https://postgresql.org/docs/current/sql-createpolicy.html">postgresql.org/docs/current/sql-createpolicy.html</a></li>
+<li><span class="t">Crunchy Data — Row Level Security for Tenants in Postgres</span>
+<span class="w">A practical walkthrough of exactly the pattern used in the companion PRD, including the session-variable approach and its pitfalls.</span>
+<a class="u" href="https://crunchydata.com/blog/row-level-security-for-tenants-in-postgres">crunchydata.com/blog/row-level-security-for-tenants-in-postgres</a></li>
+<li><span class="t">Citus — Multi-tenant applications</span>
+<span class="w">What a shared-table model looks like when it outgrows one machine: distributing by tenant, co-location, and when sharding beats siloing.</span>
+<a class="u" href="https://docs.citusdata.com/en/stable/use_cases/multi_tenant.html">docs.citusdata.com/en/stable/use_cases/multi_tenant.html</a></li>
+<li><span class="t">PostgreSQL — <code>SET</code> and <code>SET LOCAL</code></span>
+<span class="w">Short, and the difference between these two statements is the difference between working isolation and an intermittent cross-tenant leak under connection pooling.</span>
+<a class="u" href="https://postgresql.org/docs/current/sql-set.html">postgresql.org/docs/current/sql-set.html</a></li>
+<li><span class="t">PostgreSQL — Range Types and exclusion constraints</span>
+<span class="w">The mechanism behind the overlapping-screenings guarantee in the PRD (FR-22).</span>
+<a class="u" href="https://postgresql.org/docs/current/rangetypes.html">postgresql.org/docs/current/rangetypes.html</a></li>
+</ul>
+
+<h3>20.4 Concurrency, locking and idempotency</h3>
+<p>Directly relevant to the seat-hold engine, and to any system where two people can reach for one thing.</p>
+<ul class="refs">
+<li><span class="t">Redis — <code>SET</code> command, and the Distributed Locks pattern</span>
+<span class="w">The <code>NX</code> and <code>EX</code> options are the atomic primitive our hold engine is built on. The locks page covers the harder distributed case and is honest about its limits.</span>
+<a class="u" href="https://redis.io/docs/latest/commands/set/">redis.io/docs/latest/commands/set/</a>
+<a class="u" href="https://redis.io/docs/latest/develop/clients/patterns/distributed-locks/">redis.io/docs/latest/develop/clients/patterns/distributed-locks/</a></li>
+<li><span class="t">Brandur Leach — Implementing Stripe-like Idempotency Keys in Postgres</span>
+<span class="w">The clearest explanation anywhere of why idempotency keys are necessary and how to implement them properly against a relational database. Essential for the payment path.</span>
+<a class="u" href="https://brandur.org/idempotency-keys">brandur.org/idempotency-keys</a></li>
+<li><span class="t">Stripe — Idempotency (engineering blog and API reference)</span>
+<span class="w">How a payment provider expects you to retry safely — the contract our booking flow depends on.</span>
+<a class="u" href="https://stripe.com/blog/idempotency">stripe.com/blog/idempotency</a>
+<a class="u" href="https://docs.stripe.com/api/idempotent_requests">docs.stripe.com/api/idempotent_requests</a></li>
+</ul>
+
+<h3>20.5 Scale and operations</h3>
+<ul class="refs">
+<li><span class="t">Shopify Engineering — A Pods Architecture To Allow Shopify To Scale</span>
+<span class="w">The best public write-up of the pod / cell model from Chapter 8, by a company that genuinely needed it.</span>
+<a class="u" href="https://shopify.engineering/a-pods-architecture-to-allow-shopify-to-scale">shopify.engineering/a-pods-architecture-to-allow-shopify-to-scale</a></li>
+<li><span class="t">Kubernetes — Network Policies</span>
+<span class="w">The mechanism behind the namespace boundary in the companion PRD's deployment topology — isolation enforced by the network rather than by application code.</span>
+<a class="u" href="https://kubernetes.io/docs/concepts/services-networking/network-policies/">kubernetes.io/docs/concepts/services-networking/network-policies/</a></li>
+<li><span class="t">Martin Fowler — Patterns of Distributed Systems</span>
+<span class="w">Background patterns — leader election, versioned values, idempotent receiver — that appear throughout a system like this one.</span>
+<a class="u" href="https://martinfowler.com/articles/patterns-of-distributed-systems/">martinfowler.com/articles/patterns-of-distributed-systems/</a></li>
+<li><span class="t">AWS Samples — Serverless SaaS reference solution</span>
+<span class="w">A complete, runnable reference implementation of the control plane / application plane split. Reading real code makes Chapter 5 concrete quickly.</span>
+<a class="u" href="https://github.com/aws-samples/aws-saas-factory-ref-solution-serverless-saas">github.com/aws-samples/aws-saas-factory-ref-solution-serverless-saas</a></li>
+<li><span class="t">Martin Kleppmann — <i>Designing Data-Intensive Applications</i></span>
+<span class="w">O'Reilly. Not about multi-tenancy, but chapters 5–9 on replication, partitioning and transactions are the foundation under every partitioning decision in Chapter 9.</span></li>
+</ul>
+
+<h3>20.6 A suggested order</h3>
+<ol class="tight">
+<li>This document, Parts I–II — the mental model.</li>
+<li>Microsoft's <i>Tenancy models</i> page — a second voice on the same ideas, which is how concepts stick.</li>
+<li>Golding chapters 2 and 3 — the vocabulary and the deployment decision, properly.</li>
+<li>This document, Chapter 9, then Golding chapter 8 — the data decision, which is the one you cannot reverse.</li>
+<li>AWS <i>SaaS Tenant Isolation Strategies</i>, then Golding chapter 9 — enforcement.</li>
+<li>Build something. Return to Golding chapters 12 and 14 when you have tenants to operate and price.</li>
+</ol>
+
+<h3>Closing thought</h3>
+<p>Almost everything in this document reduces to one idea, applied repeatedly: <b>make the tenant boundary a property of the system rather than a responsibility of the developer.</b></p>
+<p>Every technique here — ambient tenant context, row-level security, tenant-prefixed cache keys, centrally injected log labels, tier values read from configuration — exists to move the boundary out of human memory and into machinery. Systems built that way stay safe as teams grow and people leave. Systems that rely on everyone remembering the rule are safe exactly until the first person who never heard it ships their first feature.</p>
+<p>That is the whole discipline. The rest is detail.</p>

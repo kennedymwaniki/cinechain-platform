@@ -1,0 +1,30 @@
+{
+  "name": "cinechain-docs",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "CineChain multi-tenant PRDs and the multi-tenancy masterclass",
+  "scripts": {
+    "build": "node build/build.mjs all",
+    "all": "node build/build.mjs all --open",
+    "masterclass": "node build/build.mjs masterclass --open",
+    "prd": "node build/build.mjs prd --open",
+    "plan": "node build/build.mjs plan --open",
+    "nest": "node build/build.mjs nest --open",
+    "go": "node build/build.mjs go --open",
+    "golang": "node build/build.mjs go --open",
+    "html": "node build/build.mjs all --html",
+    "html:masterclass": "node build/build.mjs masterclass --html --open",
+    "html:nest": "node build/build.mjs nest --html --open",
+    "html:go": "node build/build.mjs go --html --open",
+    "open": "google-chrome dist/*.pdf",
+    "clean": "rm -rf dist build/.render-*.html build/.cover-*.pdf build/.body-*.pdf"
+  },
+  "dependencies": {
+    "marked": "^18.0.14",
+    "puppeteer-core": "^25.11.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

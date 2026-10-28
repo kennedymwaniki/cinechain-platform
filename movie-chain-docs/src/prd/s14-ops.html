@@ -1,0 +1,44 @@
+<h2><span class="num">14</span>Observability and Operations</h2>
+
+<figure>{{d:observability}}<figcaption><b>Figure 14.1.</b> Every signal must answer &ldquo;which tenant?&rdquo; — otherwise it tells you something is wrong without telling you for whom.</figcaption></figure>
+
+<h3>14.1 Signals<span class="cite">G ch. 12, &ldquo;Multi-Tenant Operational Metrics&rdquo;, p. 310</span><span class="cite g2">MS — Measure consumption</span></h3>
+<table>
+<thead><tr><th style="width:18%">Signal</th><th style="width:34%">Tenant attribution</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>Logs</td><td><code>tenant_id</code> on every line, injected by the tenancy middleware</td><td>Never added at call sites. No customer names, seat holders or card data.</td></tr>
+<tr><td>Metrics</td><td><code>tenant</code> label; the largest ~50 tenants individually, the rest bucketed as <code>other</code></td><td>Cardinality control is deliberate — unbounded tenant labels will overwhelm Prometheus.</td></tr>
+<tr><td>Traces</td><td><code>tenant.id</code> on the root span, propagated downstream</td><td>Sample siloed tenants at 100%; they are few and their traffic matters most.</td></tr>
+<tr><td>Consumption</td><td>Requests, storage bytes, hold-seconds, bookings per tenant</td><td>Feeds billing and cost-per-tenant.</td></tr>
+</tbody></table>
+
+<h3>14.2 Alerts that matter</h3>
+<table>
+<thead><tr><th style="width:30%">Alert</th><th style="width:22%">Condition</th><th>Why this one</th></tr></thead>
+<tbody>
+<tr><td><b>Double sale detected</b></td><td>Any occurrence</td><td>Page immediately. This should be impossible; if it fires, a core guarantee has broken.</td></tr>
+<tr><td><b>Seats lost after capture</b></td><td>&gt; 3 in 10 min</td><td>Customers are being charged then refunded. Auto-handled, but the rate signals a real problem.</td></tr>
+<tr><td><b>Cross-tenant attempt</b></td><td>&gt; 10/min from one user</td><td>Either a bug in a client or someone probing. Both need investigating.</td></tr>
+<tr><td><b>Single-tenant latency</b></td><td>One tenant's p95 &gt; 3&times; the median tenant's</td><td>The noisy-neighbour detector. Impossible without tenant labels.</td></tr>
+<tr><td><b>Sweeper lag</b></td><td>Held locks past expiry &gt; 500</td><td>Inventory is being silently withheld from sale.</td></tr>
+<tr><td><b>Onboarding stuck</b></td><td>In <code>PROVISIONING</code> &gt; 5 min</td><td>A half-created tenant is worse than none.</td></tr>
+<tr><td><b>Redis unavailable</b></td><td>&gt; 30 s</td><td>Fallback path engaged; confirm bookings still succeed.</td></tr>
+</tbody></table>
+
+<h3>14.3 Runbooks</h3>
+<dl>
+<dt>A customer says a seat shows as taken but the cinema is empty</dt>
+<dd>Almost always a stranded hold. Check Redis for the key and <code>seat_lock</code> for a row past <code>expires_at</code>. If the durable row persists with no Redis key, the sweeper has stalled — check its leader election. Resolve by deleting the specific lock row; never by flushing Redis, which would drop every live hold across all tenants.</dd>
+
+<dt>One tenant is degrading the platform</dt>
+<dd>Confirm with per-tenant request rate and latency. Tighten that tenant's ingress rate limit first — it takes effect in seconds and protects everyone else immediately. Then scale Inventory. If this recurs, the tenant belongs on Premium with a dedicated database, and that is a commercial conversation rather than an engineering one.</dd>
+
+<dt>A tenant reports seeing another tenant's data</dt>
+<dd>Treat as a security incident from the first minute. Capture the request identifier and the exact response. Verify RLS is enabled and <code>FORCE</code>d on the table in question, and that the application role still has <code>rolbypassrls = false</code> — a migration run as the owner can silently change this. Do not deploy a fix before establishing the blast radius: which tenants, which rows, over what period.</dd>
+
+<dt>Payment provider outage during an on-sale</dt>
+<dd>Extend hold windows platform-wide via configuration so customers mid-flow are not penalised. Display a banner. Do not retry captures blindly — use the idempotency key and poll for the true status, or you will double-charge on recovery.</dd>
+
+<dt>Promoting a tenant from pooled to siloed</dt>
+<dd>Follow §10.3. The two steps to not skip: verify row counts and checksums before cutover, and retain the source rows afterwards so the change is reversible for a defined window.</dd>
+</dl>

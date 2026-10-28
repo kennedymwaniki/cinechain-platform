@@ -1,0 +1,264 @@
+<h2><span class="num">12</span>Implementation Guide — NestJS</h2>
+
+<figure>{{d:nest-pipeline}}<figcaption><b>Figure 12.1.</b> Where tenancy attaches to the NestJS pipeline. The interceptor runs after authentication and before any handler, which is the only correct position for it.</figcaption></figure>
+
+<h3>12.1 Tenant context</h3>
+<p>The store is a module-level singleton. Nothing outside <code>tenancy/</code> imports it directly; consumers use the accessor, which throws rather than returning a default.</p>
+<div class="code-label">tenancy/tenant-context.ts</div>
+<pre><code><span class="kw">import</span> { AsyncLocalStorage } <span class="kw">from</span> <span class="st">'node:async_hooks'</span>;
+
+<span class="kw">export type</span> TenantId = <span class="kw">string</span> &amp; { <span class="kw">readonly</span> __brand: <span class="st">'TenantId'</span> };
+
+<span class="kw">export interface</span> TenantContext {
+  tenantId: TenantId;
+  tier: <span class="st">'basic'</span> | <span class="st">'standard'</span> | <span class="st">'premium'</span> | <span class="st">'dedicated'</span>;
+  userId: <span class="kw">string</span>;
+  role: <span class="kw">string</span>;
+  holdSeconds: <span class="kw">number</span>;
+}
+
+<span class="kw">const</span> als = <span class="kw">new</span> AsyncLocalStorage&lt;TenantContext&gt;();
+
+<span class="kw">export const</span> runWithTenant = &lt;T&gt;(ctx: TenantContext, fn: () =&gt; T) =&gt;
+  als.run(ctx, fn);
+
+<span class="cm">/** Throws rather than returning undefined. A missing tenant is a bug,</span>
+<span class="cm"> *  never a case to handle gracefully — fail closed, loudly. */</span>
+<span class="kw">export function</span> <span class="fn">currentTenant</span>(): TenantContext {
+  <span class="kw">const</span> ctx = als.getStore();
+  <span class="kw">if</span> (!ctx) <span class="kw">throw new</span> Error(
+    <span class="st">'No tenant context. Code ran outside a tenant-scoped request — '</span> +
+    <span class="st">'if this is a worker, call runWithTenant() from the job payload.'</span>
+  );
+  <span class="kw">return</span> ctx;
+}</code></pre>
+
+<div class="code-label">tenancy/tenant.interceptor.ts — the most important class in the codebase</div>
+<pre><code>@Injectable()
+<span class="kw">export class</span> TenantContextInterceptor <span class="kw">implements</span> NestInterceptor {
+  <span class="fn">constructor</span>(<span class="kw">private</span> tenants: TenantRegistry, <span class="kw">private</span> db: TenantDb) {}
+
+  <span class="kw">async</span> <span class="fn">intercept</span>(exec: ExecutionContext, next: CallHandler) {
+    <span class="kw">const</span> req = exec.switchToHttp().getRequest();
+    <span class="kw">const</span> claims = req.user;                <span class="cm">// set by JwtAuthGuard</span>
+
+    <span class="cm">// 1 · ONLY from the verified token. Never a header, path or body.</span>
+    <span class="cm">//     This interceptor guards STAFF endpoints only — a consumer</span>
+    <span class="cm">//     token legitimately has no tenant claim (§4.2), and reaches</span>
+    <span class="cm">//     the application through ConsumerGuard instead.</span>
+    <span class="kw">const</span> tenantId = claims?.tenant_id <span class="kw">as</span> TenantId | <span class="kw">undefined</span>;
+    <span class="kw">if</span> (!tenantId) <span class="kw">throw new</span> UnauthorizedException(<span class="st">'no_tenant_context'</span>);
+
+    <span class="cm">// 2 · If the path also names a tenant, a mismatch is an attack.</span>
+    <span class="kw">const</span> hinted = req.params?.tenantSlug;
+    <span class="kw">if</span> (hinted &amp;&amp; hinted !== claims.tenant_slug) {
+      <span class="kw">this</span>.audit.securityEvent(<span class="st">'tenant_mismatch'</span>, { tenantId, hinted });
+      <span class="kw">throw new</span> NotFoundException();      <span class="cm">// 404, not 403 — see §8.4</span>
+    }
+
+    <span class="kw">const</span> cfg = <span class="kw">await this</span>.tenants.get(tenantId);
+    <span class="kw">if</span> (cfg.status !== <span class="st">'active'</span>) <span class="kw">throw new</span> ForbiddenException(<span class="st">'tenant_suspended'</span>);
+
+    <span class="kw">const</span> ctx: TenantContext = {
+      tenantId, tier: cfg.tier, userId: claims.sub,
+      role: claims.role, holdSeconds: cfg.holdSeconds,
+    };
+
+    <span class="cm">// 3 · Context and DB scoping established together, so they cannot diverge.</span>
+    <span class="kw">return</span> runWithTenant(ctx, () =&gt;
+      <span class="kw">this</span>.db.<span class="fn">withTenantScope</span>(ctx, () =&gt; next.handle()));
+  }
+}</code></pre>
+
+<h3>12.2 The consumer path — no tenant claim at all</h3>
+<p>Consumer endpoints cannot use the interceptor above, because a consumer token deliberately carries no tenant. The tenant is derived from the resource instead, and the two guards are mutually exclusive by design.</p>
+
+<div class="code-label">tenancy/consumer.guard.ts</div>
+<pre><code>@Injectable()
+<span class="kw">export class</span> ConsumerGuard <span class="kw">implements</span> CanActivate {
+  <span class="kw">async</span> <span class="fn">canActivate</span>(ctx: ExecutionContext) {
+    <span class="kw">const</span> req = ctx.switchToHttp().getRequest();
+    <span class="kw">const</span> claims = req.user;             <span class="cm">// may be undefined — guests are fine</span>
+
+    <span class="cm">// A STAFF token here is an error, not a convenience. It would let a</span>
+    <span class="cm">// Nyati clerk transact as a customer of Prestige. Fail loudly.</span>
+    <span class="kw">if</span> (claims?.tenant_id) {
+      <span class="kw">this</span>.audit.securityEvent(<span class="st">'wrong_token_type'</span>, { path: req.path });
+      <span class="kw">throw new</span> ForbiddenException(<span class="st">'wrong_token_type'</span>);
+    }
+
+    <span class="cm">// Guests have no identity at all. That is allowed — ownership is</span>
+    <span class="cm">// proved by the signed hold token, not by who you are.</span>
+    req.consumerId = claims?.sub ?? <span class="kw">null</span>;
+    <span class="kw">return</span> true;
+  }
+}</code></pre>
+
+<div class="code-label">inventory/hold.controller.ts — where the tenant actually comes from</div>
+<pre><code>@UseGuards(ConsumerGuard)
+@Post(<span class="st">'screenings/:id/holds'</span>)
+<span class="kw">async</span> <span class="fn">createHold</span>(@Param(<span class="st">'id'</span>) screeningId: <span class="kw">string</span>, @Body() dto: HoldDto) {
+  <span class="cm">// The caller supplied an object id. WE supply the tenant, by looking</span>
+  <span class="cm">// it up. At no point is the caller's opinion of the tenant consulted.</span>
+  <span class="kw">const</span> screening = <span class="kw">await this</span>.catalogue.<span class="fn">findPublicScreening</span>(screeningId);
+  <span class="kw">if</span> (!screening) <span class="kw">throw new</span> NotFoundException();
+
+  <span class="kw">const</span> cfg = <span class="kw">await this</span>.tenants.get(screening.tenantId);
+  <span class="kw">const</span> ctx = toSystemContext(cfg);        <span class="cm">// tenant context, no user</span>
+
+  <span class="kw">return</span> runWithTenant(ctx, () =&gt;
+    <span class="kw">this</span>.db.withTenantScope(ctx, () =&gt;
+      <span class="kw">this</span>.holds.acquire(screeningId, dto.seatIds)));
+}</code></pre>
+
+<div class="box key"><span class="bt">Why this is not &ldquo;trusting the URL&rdquo;</span>
+<p>Chapter 6 of the masterclass forbids taking the tenant from the request. This does not: the caller supplies <code>screeningId</code>, an <em>object identifier</em>, and the server derives the tenant from its own row. What would be forbidden is accepting a <code>tenant_id</code> supplied alongside it — and note there is nowhere in this handler for such a value to enter.</p>
+<p>Below this line, everything is identical to the staff path: the same <code>runWithTenant</code>, the same <code>SET LOCAL</code>, the same RLS. Only the way the tenant was <em>established</em> differs.</p></div>
+
+<h3>12.3 Data access and isolation</h3>
+<p>The provider resolves pooled versus siloed placement and issues <code>SET LOCAL</code> inside the transaction. This is the only place in the system that knows a tenant may live in a different database.</p>
+<div class="code-label">tenancy/tenant-db.provider.ts</div>
+<pre><code>@Injectable()
+<span class="kw">export class</span> TenantDb {
+  <span class="kw">private</span> pools = <span class="kw">new</span> Map&lt;<span class="kw">string</span>, Pool&gt;();
+
+  <span class="cm">/** Pooled tenants share the default pool; siloed tenants get their own.</span>
+  <span class="cm">  * Application code never learns which it received. */</span>
+  <span class="kw">private</span> <span class="fn">poolFor</span>(cfg: TenantConfig): Pool {
+    <span class="kw">const</span> ref = cfg.dbRef ?? <span class="st">'__pooled__'</span>;
+    <span class="kw">if</span> (!<span class="kw">this</span>.pools.has(ref)) <span class="kw">this</span>.pools.set(ref, createPool(ref));
+    <span class="kw">return this</span>.pools.get(ref)!;
+  }
+
+  <span class="kw">async</span> <span class="fn">withTenantScope</span>&lt;T&gt;(ctx: TenantContext, fn: () =&gt; Promise&lt;T&gt;) {
+    <span class="kw">const</span> client = <span class="kw">await this</span>.poolFor(<span class="kw">await this</span>.cfg(ctx)).connect();
+    <span class="kw">try</span> {
+      <span class="kw">await</span> client.query(<span class="st">'BEGIN'</span>);
+      <span class="cm">// SET LOCAL — scoped to this transaction. A plain SET would leak</span>
+      <span class="cm">// this tenant's id onto the pooled connection for the NEXT request.</span>
+      <span class="kw">await</span> client.query(<span class="st">'SET LOCAL app.tenant_id = $1'</span>, [ctx.tenantId]);
+      <span class="kw">const</span> result = <span class="kw">await</span> withClient(client, fn);
+      <span class="kw">await</span> client.query(<span class="st">'COMMIT'</span>);
+      <span class="kw">return</span> result;
+    } <span class="kw">catch</span> (e) {
+      <span class="kw">await</span> client.query(<span class="st">'ROLLBACK'</span>); <span class="kw">throw</span> e;
+    } <span class="kw">finally</span> { client.release(); }
+  }
+}</code></pre>
+
+<div class="box warn"><span class="bt">Two mistakes to guard against in review</span>
+<p><b>A second pool that bypasses this provider.</b> Any module that creates its own connection escapes <code>SET LOCAL</code>, and its queries will see either nothing or — if it connects as a privileged role — everything. Enforce a single connection path with a lint rule.</p>
+<p><b>Handlers that mention <code>tenantId</code>.</b> If business logic ever writes <code>where(eq(booking.tenantId, …))</code>, the boundary has moved back into application code. RLS already does this. A handler mentioning tenant scoping is a signal that someone does not trust the mechanism — resolve the doubt rather than duplicating the filter.</p></div>
+
+<h3>12.4 The hold service</h3>
+<div class="code-label">inventory/hold.service.ts</div>
+<pre><code>@Injectable()
+<span class="kw">export class</span> HoldService {
+  <span class="cm">// Registered once at boot; Redis executes it atomically.</span>
+  <span class="kw">private readonly</span> ACQUIRE = <span class="st">`
+    for i = 1, #KEYS do
+      if redis.call('EXISTS', KEYS[i]) == 1 then return {0, i} end
+    end
+    for i = 1, #KEYS do
+      redis.call('SET', KEYS[i], ARGV[1], 'NX', 'EX', ARGV[2])
+    end
+    return {1, 0}`</span>;
+
+  <span class="kw">private</span> <span class="fn">key</span>(t: TenantId, scr: <span class="kw">string</span>, seat: <span class="kw">string</span>) {
+    <span class="kw">return</span> <span class="st">`lock:t:</span>${t}<span class="st">:scr:</span>${scr}<span class="st">:seat:</span>${seat}<span class="st">`</span>;   <span class="cm">// tenant first</span>
+  }
+
+  <span class="kw">async</span> <span class="fn">acquire</span>(screeningId: <span class="kw">string</span>, seatIds: <span class="kw">string</span>[]) {
+    <span class="kw">const</span> ctx = currentTenant();
+    <span class="kw">if</span> (seatIds.length &gt; ctx.maxSeats) <span class="kw">throw new</span> BadRequestException();
+
+    <span class="kw">const</span> holdId = randomUUID();
+    <span class="kw">const</span> keys = seatIds.map(s =&gt; <span class="kw">this</span>.key(ctx.tenantId, screeningId, s));
+
+    <span class="cm">// 1 · Atomic across all seats — all or nothing.</span>
+    <span class="kw">const</span> [ok, failedIdx] = <span class="kw">await this</span>.redis.eval(
+      <span class="kw">this</span>.ACQUIRE, keys.length, ...keys, holdId, ctx.holdSeconds);
+
+    <span class="kw">if</span> (!ok) <span class="kw">throw new</span> ConflictException({
+      error: <span class="st">'seats_unavailable'</span>,
+      unavailable_seat_ids: [seatIds[failedIdx - 1]],
+    });
+
+    <span class="kw">const</span> expiresAt = <span class="kw">new</span> Date(Date.now() + ctx.holdSeconds * 1000);
+    <span class="kw">try</span> {
+      <span class="cm">// 2 · Durable record. ON CONFLICT is the belt to Redis's braces:</span>
+      <span class="cm">//     if Redis ever lets two winners through, Postgres will not.</span>
+      <span class="kw">await</span> db.insert(seatLock).values(seatIds.map(seatId =&gt; ({
+        screeningId, seatId, tenantId: ctx.tenantId,
+        status: <span class="st">'held'</span> <span class="kw">as const</span>, holdId, expiresAt,
+      }))).onConflictDoNothing();
+    } <span class="kw">catch</span> (e) {
+      <span class="kw">await this</span>.redis.del(...keys);   <span class="cm">// don't strand the seats</span>
+      <span class="kw">throw</span> e;
+    }
+    <span class="kw">return</span> { holdId, expiresAt, seconds: ctx.holdSeconds };
+  }
+}</code></pre>
+
+<h3>12.5 Converting a hold to a booking</h3>
+<p>The ordering here is deliberate and is the answer to the failure mode in §7.4. Note especially that payment is refused when the hold is nearly dead, and that a charge against a lost hold refunds itself.</p>
+<div class="code-label">booking/booking.service.ts — abbreviated</div>
+<pre><code><span class="kw">async</span> <span class="fn">confirm</span>(holdId: <span class="kw">string</span>, payment: PaymentInput, idempotencyKey: <span class="kw">string</span>) {
+  <span class="kw">const</span> ctx = currentTenant();
+
+  <span class="cm">// 1 · Refuse to start paying if the hold may die mid-flight.</span>
+  <span class="kw">const</span> ttl = <span class="kw">await this</span>.holds.ttlFor(holdId);
+  <span class="kw">if</span> (ttl &lt; 45) <span class="kw">throw new</span> GoneException({ error: <span class="st">'hold_expired'</span> });
+
+  <span class="cm">// 2 · Charge. Idempotency key = hold id, so a retry never charges twice.</span>
+  <span class="kw">const</span> charge = <span class="kw">await this</span>.payments.capture({
+    ...payment, idempotencyKey: idempotencyKey ?? holdId,
+  });
+
+  <span class="cm">// 3 · Re-verify AFTER capture. This is the window §7.4 is about.</span>
+  <span class="kw">if</span> (!<span class="kw">await this</span>.holds.stillOwned(holdId)) {
+    <span class="kw">await this</span>.payments.refund(charge.id, <span class="st">'seats_lost'</span>);
+    <span class="kw">this</span>.metrics.inc(<span class="st">'booking.seats_lost_after_capture'</span>, { tenant: ctx.tenantId });
+    <span class="kw">throw new</span> PaymentRequiredException({
+      error: <span class="st">'seats_lost_payment_refunded'</span>, refund_reference: charge.id,
+    });
+  }
+
+  <span class="cm">// 4 · One transaction: lock → sold, booking, tickets. All or nothing.</span>
+  <span class="kw">const</span> booking = <span class="kw">await</span> db.transaction(<span class="kw">async</span> tx =&gt; {
+    <span class="kw">const</span> updated = <span class="kw">await</span> tx.update(seatLock)
+      .set({ status: <span class="st">'sold'</span>, expiresAt: <span class="kw">null</span>, bookingId })
+      .where(and(eq(seatLock.holdId, holdId), eq(seatLock.status, <span class="st">'held'</span>)))
+      .returning();
+    <span class="cm">// If another process changed these rows, updated.length will not match.</span>
+    <span class="kw">if</span> (updated.length !== seatCount) tx.rollback();
+    <span class="kw">return</span> createBookingAndTickets(tx, updated, charge);
+  });
+
+  <span class="cm">// 5 · Redis has served its purpose; Postgres is now the record.</span>
+  <span class="kw">await this</span>.holds.release(holdId);
+  <span class="kw">this</span>.events.emit(<span class="st">'booking.confirmed'</span>, { tenantId: ctx.tenantId, booking });
+  <span class="kw">return</span> booking;
+}</code></pre>
+
+<h3>12.6 Background workers</h3>
+<div class="box warn"><span class="bt">Workers have no request, therefore no ambient context</span>
+<p>This is the most common place for tenant isolation to fail in a NestJS system. A BullMQ processor runs outside any HTTP request, so <code>AsyncLocalStorage</code> is empty and <code>currentTenant()</code> throws — which is the correct, fail-closed behaviour. Every job payload must therefore carry its <code>tenantId</code>, and every processor must open a tenant scope explicitly as its first action.</p></div>
+<div class="code-label">Worker pattern — apply to every processor without exception</div>
+<pre><code>@Processor(<span class="st">'notifications'</span>)
+<span class="kw">export class</span> NotificationProcessor {
+  <span class="kw">async</span> <span class="fn">process</span>(job: Job&lt;{ tenantId: TenantId; bookingId: <span class="kw">string</span> }&gt;) {
+    <span class="kw">const</span> cfg = <span class="kw">await this</span>.tenants.get(job.data.tenantId);
+
+    <span class="cm">// Establish context from the payload, exactly as the interceptor</span>
+    <span class="cm">// does from the token. Everything below is then tenant-scoped.</span>
+    <span class="kw">return</span> runWithTenant(toContext(cfg, <span class="st">'system'</span>), () =&gt;
+      <span class="kw">this</span>.db.withTenantScope(ctx, <span class="kw">async</span> () =&gt; {
+        <span class="kw">const</span> booking = <span class="kw">await</span> db.query.booking.findFirst({
+          where: eq(booking.id, job.data.bookingId),   <span class="cm">// RLS scopes it</span>
+        });
+        <span class="kw">await this</span>.sms.send(booking);
+      }));
+  }
+}</code></pre>
+<p>The sweeper of §7.5 is the deliberate exception: it runs platform-wide with an elevated role and no tenant scope. There are exactly two such jobs in the system — the sweeper and the metering aggregator — and both are marked in code, reviewed as security-sensitive, and covered by tests asserting they touch nothing else.</p>

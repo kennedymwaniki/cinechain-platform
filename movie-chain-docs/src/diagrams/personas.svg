@@ -1,0 +1,37 @@
+<svg viewBox="0 0 720 220" role="img">
+<text class="s-cap" x="0" y="11">Five people use this system, and they do not want the same things</text>
+<rect class="b-am" x="0" y="20" width="138" height="128" rx="5"/>
+<circle cx="69" cy="44" r="14" fill="var(--amber)"/><text class="s-lbw mid-a" x="69" y="48">GM</text>
+<text class="s-hd mid-a" x="69" y="72">Grace</text><text class="s-xs mid-a" x="69" y="85">Moviegoer</text>
+<text class="s-xs" x="8" y="104">Wants: 3 taps from</text><text class="s-xs" x="8" y="116">&quot;what's on&quot; to a QR code</text>
+<text class="s-xs" x="8" y="134">Leaves if: the seat map</text><text class="s-xs" x="8" y="145">is slow or lies</text>
+
+<rect class="b-bl" x="146" y="20" width="138" height="128" rx="5"/>
+<circle cx="215" cy="44" r="14" fill="var(--blue)"/><text class="s-lbw mid-a" x="215" y="48">BO</text>
+<text class="s-hd mid-a" x="215" y="72">Brian</text><text class="s-xs mid-a" x="215" y="85">Box-office clerk</text>
+<text class="s-xs" x="154" y="104">Wants: sell a walk-in</text><text class="s-xs" x="154" y="116">ticket in under 20s</text>
+<text class="s-xs" x="154" y="134">Leaves if: he must fight</text><text class="s-xs" x="154" y="145">a queue of 30 people</text>
+
+<rect class="b-gr" x="292" y="20" width="138" height="128" rx="5"/>
+<circle cx="361" cy="44" r="14" fill="var(--green)"/><text class="s-lbw mid-a" x="361" y="48">TM</text>
+<text class="s-hd mid-a" x="361" y="72">Tabitha</text><text class="s-xs mid-a" x="361" y="85">Theatre manager</text>
+<text class="s-xs" x="300" y="104">Wants: schedule next</text><text class="s-xs" x="300" y="116">week's showings fast</text>
+<text class="s-xs" x="300" y="134">Cares about: occupancy,</text><text class="s-xs" x="300" y="145">no double-booked screens</text>
+
+<rect class="b-pu" x="438" y="20" width="138" height="128" rx="5"/>
+<circle cx="507" cy="44" r="14" fill="var(--purple)"/><text class="s-lbw mid-a" x="507" y="48">CA</text>
+<text class="s-hd mid-a" x="507" y="72">Chris</text><text class="s-xs mid-a" x="507" y="85">Chain admin (tenant)</text>
+<text class="s-xs" x="446" y="104">Wants: one view across</text><text class="s-xs" x="446" y="116">all 14 theatres</text>
+<text class="s-xs" x="446" y="134">Cares about: pricing rules,</text><text class="s-xs" x="446" y="145">staff access, revenue</text>
+
+<rect class="b-w" x="584" y="20" width="136" height="128" rx="5"/>
+<circle cx="652" cy="44" r="14" fill="var(--navy)"/><text class="s-lbw mid-a" x="652" y="48">PO</text>
+<text class="s-hd mid-a" x="652" y="72">Purity</text><text class="s-xs mid-a" x="652" y="85">Platform operator</text>
+<text class="s-xs" x="592" y="104">Wants: onboard a chain</text><text class="s-xs" x="592" y="116">without an engineer</text>
+<text class="s-xs" x="592" y="134">Cares about: cost per</text><text class="s-xs" x="592" y="145">tenant, noisy neighbours</text>
+
+<rect class="b-n" x="0" y="160" width="720" height="56" rx="5"/>
+<text class="s-hdw" x="12" y="178">The tenancy insight hiding in this row of faces</text>
+<text class="s-smw" x="12" y="196">Grace, Brian, Tabitha and Chris all belong to <b>one tenant</b> and must never see another chain's data. Purity belongs to <b>no tenant</b> and</text>
+<text class="s-smw" x="12" y="211">must see across all of them. That asymmetry is why the control plane exists — and why &quot;just add an admin role&quot; is the wrong answer.</text>
+</svg>

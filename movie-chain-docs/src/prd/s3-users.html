@@ -1,0 +1,63 @@
+<h2><span class="num">3</span>Users and Their Jobs</h2>
+<p class="lede">Five people use this system, and they sit in three different relationships to tenancy. Only three of them belong to a chain at all — a distinction that shapes the entire identity design in §4.2.</p>
+
+<figure>{{d:personas}}<figcaption><b>Figure 3.1.</b> The five personas. Brian, Tabitha and Chris are staff of one chain. Purity belongs to no chain and spans all of them. Grace belongs to no chain either — she buys from them.</figcaption></figure>
+
+<div class="box key"><span class="bt">Read Grace's row carefully</span>
+<p>Grace is <b>not</b> a user of Nyati Cinemas. She is a member of the public who buys tickets, most often with no account at all, and who will buy from a different chain the week she travels. She is a customer <em>of the platform</em>, transacting <em>with</em> chains.</p>
+<p>This is the single most consequential correction in this document. Treating her as a tenant-scoped user produces a product that stops working the moment she leaves town — see §4.2.</p></div>
+
+<h3>User stories</h3>
+<h4>Grace — moviegoer</h4>
+<table>
+<thead><tr><th style="width:8%">ID</th><th style="width:56%">Story</th><th style="width:10%">Pri</th><th>Acceptance highlight</th></tr></thead>
+<tbody>
+<tr><td>C-1</td><td>As a moviegoer, I want to see what is showing near me this week, so I can plan an outing.</td><td class="c"><span class="pill p0">P0</span></td><td>Films filterable by town, date and language</td></tr>
+<tr><td>C-2</td><td>As a moviegoer, I want to see all showtimes for one film across nearby theatres, so I can pick the most convenient.</td><td class="c"><span class="pill p0">P0</span></td><td>Grouped by theatre, sold-out screenings marked</td></tr>
+<tr><td>C-3</td><td>As a moviegoer, I want to pick my exact seats on a map of the auditorium.</td><td class="c"><span class="pill p0">P0</span></td><td>Taken seats greyed, never hidden; live updates</td></tr>
+<tr><td>C-4</td><td>As a moviegoer, I want my chosen seats held while I pay, so nobody takes them mid-transaction.</td><td class="c"><span class="pill p0">P0</span></td><td>5-minute hold, countdown shown from server time</td></tr>
+<tr><td>C-5</td><td>As a moviegoer, I want to pay by M-Pesa or card and receive a ticket immediately.</td><td class="c"><span class="pill p0">P0</span></td><td>QR ticket by SMS and e-mail within 30 s</td></tr>
+<tr><td>C-6</td><td>As a moviegoer, I want to be told clearly if my hold expires, and offered the seats again if still free.</td><td class="c"><span class="pill p1">P1</span></td><td>Explicit expiry screen, one-click re-hold</td></tr>
+<tr><td>C-7</td><td>As a moviegoer, I want to see my past and upcoming bookings.</td><td class="c"><span class="pill p1">P1</span></td><td>Scoped to this tenant only</td></tr>
+<tr><td>C-8</td><td>As a moviegoer, I want to cancel and be refunded within the chain's policy.</td><td class="c"><span class="pill p1">P1</span></td><td>Policy window enforced server-side</td></tr>
+</tbody></table>
+
+<h4>Brian — box-office clerk</h4>
+<table>
+<thead><tr><th style="width:8%">ID</th><th style="width:56%">Story</th><th style="width:10%">Pri</th><th>Acceptance highlight</th></tr></thead>
+<tbody>
+<tr><td>B-1</td><td>As a clerk, I want to sell a walk-in ticket in under twenty seconds.</td><td class="c"><span class="pill p0">P0</span></td><td>Same inventory as online; cash tender supported</td></tr>
+<tr><td>B-2</td><td>As a clerk, I want to see the same live seat map the website shows.</td><td class="c"><span class="pill p0">P0</span></td><td>One inventory, no reconciliation</td></tr>
+<tr><td>B-3</td><td>As a clerk, I want to scan a ticket at the door and be told plainly whether it is valid.</td><td class="c"><span class="pill p0">P0</span></td><td>Already-used tickets rejected clearly</td></tr>
+<tr><td>B-4</td><td>As a clerk, I want to keep selling if the internet drops briefly.</td><td class="c"><span class="pill p2">P2</span></td><td>Offline scan queue; deferred past v1</td></tr>
+</tbody></table>
+
+<h4>Tabitha — theatre manager, and Chris — chain administrator</h4>
+<table>
+<thead><tr><th style="width:8%">ID</th><th style="width:56%">Story</th><th style="width:10%">Pri</th><th>Acceptance highlight</th></tr></thead>
+<tbody>
+<tr><td>T-1</td><td>As a manager, I want to define my screens and their seat layouts once.</td><td class="c"><span class="pill p0">P0</span></td><td>Row/seat generator plus manual adjustment</td></tr>
+<tr><td>T-2</td><td>As a manager, I want to schedule a film several times a day without creating clashes.</td><td class="c"><span class="pill p0">P0</span></td><td>Overlap rejected, including cleaning turnaround</td></tr>
+<tr><td>T-3</td><td>As a manager, I want to cancel a screening and have every affected customer refunded and told.</td><td class="c"><span class="pill p1">P1</span></td><td>Bulk refund with audit trail</td></tr>
+<tr><td>T-4</td><td>As a manager, I want to see tonight's occupancy per screen.</td><td class="c"><span class="pill p1">P1</span></td><td>Live, not overnight batch</td></tr>
+<tr><td>A-1</td><td>As a chain admin, I want one revenue and occupancy view across all my theatres.</td><td class="c"><span class="pill p0">P0</span></td><td>Cross-theatre, strictly within my tenant</td></tr>
+<tr><td>A-2</td><td>As a chain admin, I want to set pricing rules per seat class and screening type.</td><td class="c"><span class="pill p0">P0</span></td><td>Effective-dated, never retroactive</td></tr>
+<tr><td>A-3</td><td>As a chain admin, I want to manage staff accounts and their permissions.</td><td class="c"><span class="pill p0">P0</span></td><td>Roles scoped to theatre or whole chain</td></tr>
+<tr><td>A-4</td><td>As a chain admin, I want to export my data.</td><td class="c"><span class="pill p1">P1</span></td><td>CSV of my tenant's data only</td></tr>
+</tbody></table>
+
+<h4>Purity — platform operator (control plane)</h4>
+<table>
+<thead><tr><th style="width:8%">ID</th><th style="width:56%">Story</th><th style="width:10%">Pri</th><th>Acceptance highlight</th></tr></thead>
+<tbody>
+<tr><td>O-1</td><td>As an operator, I want to onboard a new chain without an engineer.</td><td class="c"><span class="pill p0">P0</span></td><td>&lt; 60 s, fully automated, resumable on failure</td></tr>
+<tr><td>O-2</td><td>As an operator, I want to see health and consumption per tenant.</td><td class="c"><span class="pill p0">P0</span></td><td>Ranked by degradation, not by traffic</td></tr>
+<tr><td>O-3</td><td>As an operator, I want to change a tenant's tier and have limits take effect promptly.</td><td class="c"><span class="pill p1">P1</span></td><td>Effective within one token lifetime</td></tr>
+<tr><td>O-4</td><td>As an operator, I want to suspend a tenant for non-payment.</td><td class="c"><span class="pill p1">P1</span></td><td>Logins blocked, jobs stopped, data retained</td></tr>
+<tr><td>O-5</td><td>As an operator, I want to promote a tenant from the shared database to a dedicated one.</td><td class="c"><span class="pill p1">P1</span></td><td>A supported operation, not a project</td></tr>
+<tr><td>O-6</td><td>As an operator, I want to know what each tenant costs to serve.</td><td class="c"><span class="pill p1">P1</span></td><td>Monthly, apportioned by consumption</td></tr>
+<tr><td>O-7</td><td>As an operator, I want to offboard a tenant and prove deletion.</td><td class="c"><span class="pill p1">P1</span></td><td>Export, then verified erasure within 30 days</td></tr>
+</tbody></table>
+
+<div class="box warn"><span class="bt">The story that must never be written</span>
+<p>There is no story of the form <em>&ldquo;as a chain admin, I want to see how my competitors are performing&rdquo;</em> — and no story that would require one tenant's user to read another tenant's data for any reason, including benchmarking, support or troubleshooting. Where a genuine cross-tenant need exists, such as platform-wide analytics, it belongs to Purity in the control plane and is served from an aggregated store, never by relaxing isolation in the application.</p></div>

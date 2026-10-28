@@ -1,0 +1,37 @@
+<svg viewBox="0 0 720 236" role="img">
+<text class="s-cap" x="0" y="11">How a request finds the right tenant</text>
+<rect class="b-w" x="0" y="22" width="234" height="132" rx="5"/>
+<text class="s-hd" x="12" y="40">A · Subdomain per tenant</text>
+<rect class="b-n" x="12" y="48" width="210" height="22" rx="3"/>
+<text class="s-monow mid-a" x="117" y="63">nyati.cinechain.app</text>
+<text class="s-sm" x="12" y="88">✓  Tenant known before login</text>
+<text class="s-sm" x="12" y="103">✓  Feels bespoke to the customer</text>
+<text class="s-sm" x="12" y="118">✗  Wildcard DNS + wildcard TLS</text>
+<text class="s-sm" x="12" y="133">✗  CORS and cookie scoping get fiddly</text>
+<text class="s-xs" x="12" y="147">Best for B2B consoles</text>
+
+<rect class="b-bl" x="243" y="22" width="234" height="132" rx="5"/>
+<text class="s-hd" x="255" y="40">B · One domain, token decides</text>
+<rect class="b-n" x="255" y="48" width="210" height="22" rx="3"/>
+<text class="s-monow mid-a" x="360" y="63">app.cinechain.app + JWT</text>
+<text class="s-sm" x="255" y="88">✓  One certificate, one origin</text>
+<text class="s-sm" x="255" y="103">✓  Simplest to operate</text>
+<text class="s-sm" x="255" y="118">✗  Login must resolve the tenant</text>
+<text class="s-sm" x="255" y="133">✗  Same e-mail at two chains = ambiguity</text>
+<text class="s-xs" x="255" y="147">Best default — and what we recommend</text>
+
+<rect class="b-am" x="486" y="22" width="234" height="132" rx="5"/>
+<text class="s-hd" x="498" y="40">C · Path prefix</text>
+<rect class="b-n" x="498" y="48" width="210" height="22" rx="3"/>
+<text class="s-monow mid-a" x="603" y="63">/t/nyati/screenings</text>
+<text class="s-sm" x="498" y="88">✓  Trivial to route and cache</text>
+<text class="s-sm" x="498" y="103">✓  Easy to read in logs</text>
+<text class="s-sm" x="498" y="118">✗  Tempting to trust the URL</text>
+<text class="s-sm" x="498" y="133">✗  Leaks tenant names publicly</text>
+<text class="s-xs" x="498" y="147">Fine internally, risky externally</text>
+
+<rect class="b-rd" x="0" y="166" width="720" height="64" rx="5"/>
+<text class="s-hd" x="14" y="184">The rule that outranks all three</text>
+<text class="s-sm" x="14" y="202">Whatever appears in the URL is a <b>hint</b>, never an authority. The tenant you act on comes from the signed token, always.</text>
+<text class="s-sm" x="14" y="217">If the path says <tspan class="s-mono">/t/prestige</tspan> and the token says <tspan class="s-mono">nyati</tspan>, that is not a routing question — it is an attack, and the answer is 403.</text>
+</svg>

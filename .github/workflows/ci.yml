@@ -1,0 +1,87 @@
+# CineChain API — lint → build → unit → isolation → e2e (onboarding smoke).
+# Make the "isolation" job a REQUIRED status check on the default branch
+# (Settings → Branches → protection rule). It must never be skipped: it is the
+# only thing standing between a forgotten policy and a cross-tenant breach.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: movie-chain-api
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { package_json_file: movie-chain-api/package.json }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 25
+          cache: pnpm
+          cache-dependency-path: movie-chain-api/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm build
+
+  unit:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { package_json_file: movie-chain-api/package.json }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 25
+          cache: pnpm
+          cache-dependency-path: movie-chain-api/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test # Testcontainers: real postgres:17-alpine via the runner's Docker
+
+  isolation:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { package_json_file: movie-chain-api/package.json }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 25
+          cache: pnpm
+          cache-dependency-path: movie-chain-api/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:isolation
+      - run: pnpm test:concurrency
+
+  # The onboarding smoke test: create a throwaway tenant, use it, delete it.
+  # Also run it against every deployed environment after each deploy.
+  e2e:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { package_json_file: movie-chain-api/package.json }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 25
+          cache: pnpm
+          cache-dependency-path: movie-chain-api/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:e2e

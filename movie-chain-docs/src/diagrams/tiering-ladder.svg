@@ -1,0 +1,52 @@
+<svg viewBox="0 0 720 268" role="img">
+<text class="s-cap" x="0" y="11">Tiers — where the architecture meets the price list</text>
+<rect class="b-w" x="0" y="22" width="168" height="196" rx="5"/>
+<rect class="b-n" x="0" y="22" width="168" height="26" rx="5"/><text class="s-lbw mid-a" x="84" y="39">BASIC</text>
+<text class="s-sm mid-a" x="84" y="64">Single-screen cinemas</text>
+<text class="s-xs" x="10" y="86">Deployment   fully pooled</text>
+<text class="s-xs" x="10" y="102">Data          shared tables + RLS</text>
+<text class="s-xs" x="10" y="118">Rate limit    60 req/min</text>
+<text class="s-xs" x="10" y="134">Theatres      up to 2</text>
+<text class="s-xs" x="10" y="150">Support       e-mail, 48h</text>
+<text class="s-xs" x="10" y="166">Backups       shared, 7 days</text>
+<rect class="b-w" x="10" y="178" width="148" height="30" rx="4"/>
+<text class="s-xs mid-a" x="84" y="190">Cost to serve: very low</text><text class="s-xs mid-a" x="84" y="202">Margin: excellent</text>
+
+<rect class="b-bl" x="184" y="22" width="168" height="196" rx="5"/>
+<rect class="b-n2" x="184" y="22" width="168" height="26" rx="5"/><text class="s-lbw mid-a" x="268" y="39">STANDARD</text>
+<text class="s-sm mid-a" x="268" y="64">Regional chains</text>
+<text class="s-xs" x="194" y="86">Deployment   pooled</text>
+<text class="s-xs" x="194" y="102">Data          shared tables + RLS</text>
+<text class="s-xs" x="194" y="118">Rate limit    600 req/min</text>
+<text class="s-xs" x="194" y="134">Theatres      up to 20</text>
+<text class="s-xs" x="194" y="150">Support       chat, 8h</text>
+<text class="s-xs" x="194" y="166">Backups       shared, 30 days</text>
+<rect class="b" x="194" y="178" width="148" height="30" rx="4"/>
+<text class="s-xs mid-a" x="268" y="190">Cost to serve: low</text><text class="s-xs mid-a" x="268" y="202">Margin: very good</text>
+
+<rect class="b-am" x="368" y="22" width="168" height="196" rx="5"/>
+<rect x="368" y="22" width="168" height="26" rx="5" fill="var(--amber)"/><text class="s-lbw mid-a" x="452" y="39">PREMIUM</text>
+<text class="s-sm mid-a" x="452" y="64">National chains</text>
+<text class="s-xs" x="378" y="86">Deployment   pooled compute</text>
+<text class="s-xs" x="378" y="102">Data          own database (silo)</text>
+<text class="s-xs" x="378" y="118">Rate limit    3 000 req/min</text>
+<text class="s-xs" x="378" y="134">Theatres      unlimited</text>
+<text class="s-xs" x="378" y="150">Support       phone, 1h</text>
+<text class="s-xs" x="378" y="166">Backups       own, 90 days, PITR</text>
+<rect class="b" x="378" y="178" width="148" height="30" rx="4"/>
+<text class="s-xs mid-a" x="452" y="190">Cost to serve: moderate</text><text class="s-xs mid-a" x="452" y="202">Margin: good</text>
+
+<rect class="b-gr" x="552" y="22" width="168" height="196" rx="5"/>
+<rect x="552" y="22" width="168" height="26" rx="5" fill="var(--green)"/><text class="s-lbw mid-a" x="636" y="39">DEDICATED</text>
+<text class="s-sm mid-a" x="636" y="64">Contractual isolation</text>
+<text class="s-xs" x="562" y="86">Deployment   full-stack silo</text>
+<text class="s-xs" x="562" y="102">Data          own everything</text>
+<text class="s-xs" x="562" y="118">Rate limit    negotiated</text>
+<text class="s-xs" x="562" y="134">Theatres      unlimited</text>
+<text class="s-xs" x="562" y="150">Support       named engineer</text>
+<text class="s-xs" x="562" y="166">Backups       own keys, own region</text>
+<rect class="b" x="562" y="178" width="148" height="30" rx="4"/>
+<text class="s-xs mid-a" x="636" y="190">Cost to serve: high</text><text class="s-xs mid-a" x="636" y="202">Margin: thin — price it</text>
+<rect class="b-n" x="0" y="230" width="720" height="34" rx="5"/>
+<text class="s-smw" x="14" y="249">One codebase reads <tspan class="s-monow">tenant.tier</tspan> and behaves differently. Nobody forks the product. If a tier needs a code fork, the tier is wrong.</text>
+</svg>

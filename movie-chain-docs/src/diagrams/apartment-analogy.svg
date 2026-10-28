@@ -1,0 +1,39 @@
+<svg viewBox="0 0 720 262" role="img">
+<g><rect class="b-dash" x="0" y="20" width="228" height="200" rx="6"/>
+<text class="s-cap" x="10" y="12">Detached houses</text>
+<path class="ln-f" d="M24 108 L60 78 L96 108" stroke-width="1.6"/><rect class="b-w" x="30" y="108" width="60" height="42" rx="2"/><rect class="b-am" x="50" y="126" width="20" height="24"/>
+<path class="ln-f" d="M108 108 L144 78 L180 108" stroke-width="1.6"/><rect class="b-w" x="114" y="108" width="60" height="42" rx="2"/><rect class="b-am" x="134" y="126" width="20" height="24"/>
+<path class="ln-f" d="M60 178 L96 148 L132 178" stroke-width="1.6"/><rect class="b-w" x="66" y="178" width="60" height="42" rx="2"/><rect class="b-am" x="86" y="196" width="20" height="24"/>
+<text class="s-lb" x="10" y="238">Own walls, own plumbing, own roof.</text>
+<text class="s-sm" x="10" y="252">Total privacy — and you pay for every roof.</text></g>
+
+<g><rect class="b-dasha" x="246" y="20" width="228" height="200" rx="6"/>
+<text class="s-cap" x="256" y="12">One apartment block</text>
+<rect class="b-w" x="286" y="44" width="148" height="176" rx="3"/>
+<rect class="b-n" x="286" y="44" width="148" height="18" rx="3"/><text class="s-lbw mid-a" x="360" y="57">SHARED BUILDING</text>
+<g><rect class="b-am" x="296" y="70" width="60" height="30" rx="3"/><text class="s-sm mid-a" x="326" y="89">Flat 1</text>
+<rect class="b-bl" x="364" y="70" width="60" height="30" rx="3"/><text class="s-sm mid-a" x="394" y="89">Flat 2</text>
+<rect class="b-gr" x="296" y="106" width="60" height="30" rx="3"/><text class="s-sm mid-a" x="326" y="125">Flat 3</text>
+<rect class="b-pu" x="364" y="106" width="60" height="30" rx="3"/><text class="s-sm mid-a" x="394" y="125">Flat 4</text></g>
+<rect class="b-w" x="296" y="144" width="128" height="20" rx="3"/><text class="s-sm mid-a" x="360" y="158">Shared lifts · water · power</text>
+<rect class="b-w" x="296" y="168" width="128" height="20" rx="3"/><text class="s-sm mid-a" x="360" y="182">One caretaker for all</text>
+<rect class="b-rd" x="296" y="192" width="128" height="20" rx="3"/><text class="s-sm mid-a" x="360" y="206">Locks keep neighbours out</text>
+<text class="s-lb" x="256" y="238">Shared structure, private units.</text>
+<text class="s-sm" x="256" y="252">Cheap per resident — locks do the work.</text></g>
+
+<g><rect class="b-dashb" x="492" y="20" width="228" height="200" rx="6"/>
+<text class="s-capb" x="502" y="12">Mixed estate</text>
+<rect class="b-w" x="502" y="34" width="208" height="88" rx="3"/>
+<rect class="b-n2" x="502" y="34" width="208" height="17" rx="3"/><text class="s-lbw mid-a" x="606" y="47">BLOCK — standard residents</text>
+<rect class="b-bl" x="512" y="58" width="44" height="26" rx="3"/><text class="s-xs mid-a" x="534" y="74">Flat 1</text>
+<rect class="b-bl" x="562" y="58" width="44" height="26" rx="3"/><text class="s-xs mid-a" x="584" y="74">Flat 2</text>
+<rect class="b-bl" x="612" y="58" width="44" height="26" rx="3"/><text class="s-xs mid-a" x="634" y="74">Flat 3</text>
+<rect class="b-bl" x="662" y="58" width="38" height="26" rx="3"/><text class="s-xs mid-a" x="681" y="74">Flat 4</text>
+<text class="s-sm" x="512" y="102">Shared everything · lowest cost</text>
+<text class="s-xs" x="512" y="115">Most residents live here</text>
+<path class="ln-f" d="M540 156 L576 128 L612 156" stroke-width="1.6"/>
+<rect class="b-am" x="546" y="156" width="60" height="40" rx="2"/><text class="s-xs mid-a" x="576" y="180">VIP villa</text>
+<rect class="b-am" x="626" y="132" width="74" height="64" rx="3"/><text class="s-xs mid-a" x="663" y="158">Bank vault</text><text class="s-xs mid-a" x="663" y="172">tenant</text>
+<text class="s-lb" x="502" y="238">Most share; a few pay for own walls.</text>
+<text class="s-sm" x="502" y="252">The model nearly every real SaaS lands on.</text></g>
+</svg>

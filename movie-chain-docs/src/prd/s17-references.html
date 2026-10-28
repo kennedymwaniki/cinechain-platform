@@ -1,0 +1,90 @@
+<h2><span class="num">17</span>References</h2>
+<p class="lede">Two kinds of citation marker appear in this document: <span class="cite">G ch. 8, p. 195</span> for the primary source, and <span class="cite g2">Redis — SET command</span> for freely available online material. Links checked 22 September 2026.</p>
+
+<h3>17.1 Primary source</h3>
+<ul class="refs">
+<li><span class="t">Tod Golding — <i>Building Multi-Tenant SaaS Architectures</i></span>
+<span class="w">O'Reilly Media, 1st edition, May 2024. ISBN 978-1-098-14064-9.<br>
+The source of the silo / pool / bridge vocabulary, the control-plane / application-plane split, and the &ldquo;default to pooled&rdquo; guidance adopted in ADR-001. Chapter references used in this document: ch. 2 (fundamentals, p. 23), ch. 3 (deployment models, p. 47), ch. 4 (onboarding and identity, p. 81), ch. 7 (building services, p. 157), ch. 8 (data partitioning, p. 189), ch. 9 (tenant isolation, p. 219), ch. 12 (operations, p. 307), ch. 14 (tiering, p. 363).</span></li>
+<li><span class="t">Companion volume — <i>Multi-Tenant Architecture: A Masterclass</i></span>
+<span class="w">The conceptual background to every tenancy decision in this PRD, written to be read first. Its Chapter 9 is the long-form version of ADR-001; its Chapter 20 carries a fuller reading list than this appendix.</span></li>
+</ul>
+
+<h3>17.2 Partitioning and isolation</h3>
+<p>Background for Sections 4, 6 and 10.</p>
+<ul class="refs">
+<li><span class="t">Microsoft — Architecting multitenant solutions on Azure</span>
+<span class="w">The most complete free treatment available, and largely cloud-neutral in its reasoning. <i>Tenancy models</i> and <i>Architectural approaches for storage and data</i> cover the same three options as ADR-001.</span>
+<a class="u" href="https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/overview">learn.microsoft.com/en-us/azure/architecture/guide/multitenant/overview</a>
+<a class="u" href="https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/tenancy-models">learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/tenancy-models</a>
+<a class="u" href="https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/approaches/storage-data">learn.microsoft.com/en-us/azure/architecture/guide/multitenant/approaches/storage-data</a></li>
+<li><span class="t">AWS — SaaS Tenant Isolation Strategies (whitepaper)</span>
+<span class="w">The best free document on isolation enforcement specifically — the three layers referenced in §9.4.</span>
+<a class="u" href="https://docs.aws.amazon.com/whitepapers/latest/saas-tenant-isolation-strategies/saas-tenant-isolation-strategies.html">docs.aws.amazon.com/whitepapers/latest/saas-tenant-isolation-strategies/saas-tenant-isolation-strategies.html</a></li>
+<li><span class="t">AWS — SaaS Lens, Well-Architected Framework</span>
+<span class="w">A review checklist to run this design against before build starts.</span>
+<a class="u" href="https://docs.aws.amazon.com/wellarchitected/latest/saas-lens/saas-lens.html">docs.aws.amazon.com/wellarchitected/latest/saas-lens/saas-lens.html</a></li>
+<li><span class="t">Microsoft — Multi-tenant SaaS database tenancy patterns (Azure SQL)</span>
+<span class="w">Operational detail on moving a tenant between pooled and dedicated storage — the procedure in §10.3.</span>
+<a class="u" href="https://learn.microsoft.com/en-us/azure/azure-sql/database/saas-tenancy-app-design-patterns">learn.microsoft.com/en-us/azure/azure-sql/database/saas-tenancy-app-design-patterns</a></li>
+</ul>
+
+<h3>17.3 PostgreSQL</h3>
+<p>Background for Section 6.</p>
+<ul class="refs">
+<li><span class="t">PostgreSQL — Row Security Policies, and CREATE POLICY</span>
+<span class="w">The mechanism §6.4 depends on. Read the notes on table owners and <code>FORCE ROW LEVEL SECURITY</code> — that is where the classic mistake lives.</span>
+<a class="u" href="https://postgresql.org/docs/current/ddl-rowsecurity.html">postgresql.org/docs/current/ddl-rowsecurity.html</a>
+<a class="u" href="https://postgresql.org/docs/current/sql-createpolicy.html">postgresql.org/docs/current/sql-createpolicy.html</a></li>
+<li><span class="t">PostgreSQL — <code>SET</code> and <code>SET LOCAL</code></span>
+<span class="w">The difference between these two statements is the difference between working isolation and an intermittent cross-tenant leak under pooling (§12.2).</span>
+<a class="u" href="https://postgresql.org/docs/current/sql-set.html">postgresql.org/docs/current/sql-set.html</a></li>
+<li><span class="t">PostgreSQL — Range types and exclusion constraints</span>
+<span class="w">Behind the no-overlapping-screenings guarantee, FR-22.</span>
+<a class="u" href="https://postgresql.org/docs/current/rangetypes.html">postgresql.org/docs/current/rangetypes.html</a></li>
+<li><span class="t">Crunchy Data — Row Level Security for Tenants in Postgres</span>
+<span class="w">A practical walkthrough of exactly the session-variable pattern used here.</span>
+<a class="u" href="https://crunchydata.com/blog/row-level-security-for-tenants-in-postgres">crunchydata.com/blog/row-level-security-for-tenants-in-postgres</a></li>
+<li><span class="t">Citus — Multi-tenant applications</span>
+<span class="w">What Option A looks like past one machine: distribution by tenant, co-location, and when sharding beats siloing. Relevant to the revisit triggers in ADR-001.</span>
+<a class="u" href="https://docs.citusdata.com/en/stable/use_cases/multi_tenant.html">docs.citusdata.com/en/stable/use_cases/multi_tenant.html</a></li>
+</ul>
+
+<h3>17.4 The hold engine — concurrency and idempotency</h3>
+<p>Background for Section 7.</p>
+<ul class="refs">
+<li><span class="t">Redis — <code>SET</code> command, and the Distributed Locks pattern</span>
+<span class="w"><code>NX</code> and <code>EX</code> are the atomic primitive §7.3 is built on. The locks page is honest about what a single-instance lock does and does not guarantee.</span>
+<a class="u" href="https://redis.io/docs/latest/commands/set/">redis.io/docs/latest/commands/set/</a>
+<a class="u" href="https://redis.io/docs/latest/develop/clients/patterns/distributed-locks/">redis.io/docs/latest/develop/clients/patterns/distributed-locks/</a></li>
+<li><span class="t">Brandur Leach — Implementing Stripe-like Idempotency Keys in Postgres</span>
+<span class="w">The clearest explanation of why idempotency keys are necessary and how to implement them against a relational database. Directly applicable to FR-51 and the failure table in §7.4.</span>
+<a class="u" href="https://brandur.org/idempotency-keys">brandur.org/idempotency-keys</a></li>
+<li><span class="t">Stripe — Idempotency</span>
+<span class="w">The retry contract the booking flow assumes of any payment provider.</span>
+<a class="u" href="https://stripe.com/blog/idempotency">stripe.com/blog/idempotency</a>
+<a class="u" href="https://docs.stripe.com/api/idempotent_requests">docs.stripe.com/api/idempotent_requests</a></li>
+</ul>
+
+<h3>17.5 Deployment and operations</h3>
+<p>Background for Sections 10 and 14.</p>
+<ul class="refs">
+<li><span class="t">Kubernetes — Network Policies</span>
+<span class="w">The boundary in Figure 10.3 that is enforced by the network rather than by application code.</span>
+<a class="u" href="https://kubernetes.io/docs/concepts/services-networking/network-policies/">kubernetes.io/docs/concepts/services-networking/network-policies/</a></li>
+<li><span class="t">Google Cloud — Multi-tenancy overview (GKE)</span>
+<span class="w">Namespace-per-tenant, resource quotas and node isolation — the cluster topology in §10.3.</span>
+<a class="u" href="https://cloud.google.com/kubernetes-engine/docs/concepts/multitenancy-overview">cloud.google.com/kubernetes-engine/docs/concepts/multitenancy-overview</a></li>
+<li><span class="t">Microsoft — Measure consumption, and Pricing models</span>
+<span class="w">Turning per-tenant metering (FR-67) into a defensible price list.</span>
+<a class="u" href="https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/measure-consumption">learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/measure-consumption</a>
+<a class="u" href="https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/pricing-models">learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/pricing-models</a></li>
+<li><span class="t">Shopify Engineering — A Pods Architecture To Allow Shopify To Scale</span>
+<span class="w">The best public account of the pod / cell model, should the blast-radius targets in §9.3 ever require it.</span>
+<a class="u" href="https://shopify.engineering/a-pods-architecture-to-allow-shopify-to-scale">shopify.engineering/a-pods-architecture-to-allow-shopify-to-scale</a></li>
+<li><span class="t">AWS Samples — Serverless SaaS reference solution</span>
+<span class="w">A runnable reference implementation of the control-plane / application-plane split, useful when Section 10 feels abstract.</span>
+<a class="u" href="https://github.com/aws-samples/aws-saas-factory-ref-solution-serverless-saas">github.com/aws-samples/aws-saas-factory-ref-solution-serverless-saas</a></li>
+<li><span class="t">Martin Kleppmann — <i>Designing Data-Intensive Applications</i></span>
+<span class="w">O'Reilly. Chapters 5–9 on replication, partitioning and transactions underpin both ADR-001 and the hold engine.</span></li>
+</ul>

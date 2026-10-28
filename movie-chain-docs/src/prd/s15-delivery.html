@@ -1,0 +1,42 @@
+<h2><span class="num">15</span>Delivery Plan</h2>
+
+<figure>{{d:roadmap}}<figcaption><b>Figure 15.1.</b> Five increments over roughly 24 weeks. The sequencing rule in red is the one that must not be negotiated away under schedule pressure.</figcaption></figure>
+
+<h3>15.1 The increments</h3>
+<table class="lg">
+<thead><tr><th style="width:10%">Phase</th><th style="width:10%">Weeks</th><th style="width:34%">Delivers</th><th>Demonstrable at the end</th></tr></thead>
+<tbody>
+<tr><td><b>P0</b><br>Foundation</td><td>1–4</td><td>Tenant registry and onboarding state machine; identity with tenant claims; schema with <code>tenant_id</code> and RLS everywhere; tenancy middleware; CI with the isolation suite</td><td>Two tenants exist, are onboarded automatically, and demonstrably cannot see each other. No product features yet.</td></tr>
+<tr><td><b>P1</b><br>Catalogue</td><td>5–9</td><td>Theatres, screens, seat-layout generator, films, screenings with overlap prevention, pricing rules, browsing and seat-map read</td><td>A chain configures a venue and publishes a week of showtimes; customers can browse them.</td></tr>
+<tr><td><b>P2</b><br>Booking core</td><td>10–14</td><td>Hold engine, sweeper, booking confirmation, payment integration, ticket issue and scan, refunds</td><td>End-to-end: browse → hold → pay → QR ticket → scan at the door. The product is usable.</td></tr>
+<tr><td><b>P3</b><br>Operations</td><td>15–19</td><td>Tenant-aware metrics, logs and traces; operator console; reporting; metering; cost-per-tenant</td><td>Operate the platform without reading raw logs; know what each tenant costs.</td></tr>
+<tr><td><b>P4</b><br>Tiering</td><td>20–24</td><td>Tier configuration, rate limiting, siloed database support, pool→silo migration, suspend and offboard</td><td>Four tiers sellable from one codebase; a tenant promoted to a dedicated database without downtime.</td></tr>
+</tbody></table>
+
+<div class="box warn"><span class="bt">The one sequencing rule</span>
+<p>Tenancy is in P0, before any feature. This will feel wrong in week two, when there is one customer and nothing to show, and there will be pressure to &ldquo;add <code>tenant_id</code> later&rdquo;.</p>
+<p>Retrofitting tenancy onto a live schema means re-partitioning production data, rewriting every query, re-issuing every credential and re-testing every endpoint — a quarter of work, under pressure, with customers watching. Doing it first costs about a week. This is the highest-leverage decision in the plan and the one most likely to be argued away.</p></div>
+
+<h3>15.2 Definition of done</h3>
+<p>A P0-critical story is not done until all of the following hold. These are checked at review, not asserted in a stand-up.</p>
+<ul class="check">
+<li>Every new table carries <code>tenant_id</code>, has RLS enabled and <code>FORCE</code>d, and has an isolation policy.</li>
+<li>Every new endpoint appears in the generated isolation suite and passes it.</li>
+<li>Every new index on a tenant-scoped table leads with <code>tenant_id</code>, or has a written justification.</li>
+<li>Every new background job establishes tenant context from its payload.</li>
+<li>Every new cache key, queue name and object-storage path is tenant-prefixed.</li>
+<li>No tier name appears in business logic.</li>
+<li>Logs and metrics emitted by the new code carry the tenant label.</li>
+<li>The onboarding smoke test still passes.</li>
+</ul>
+
+<h3>15.3 Team shape</h3>
+<table>
+<thead><tr><th style="width:26%">Role</th><th style="width:12%">Count</th><th>Focus</th></tr></thead>
+<tbody>
+<tr><td>Backend engineers</td><td class="c">3</td><td>One owns <code>tenancy/</code> and the hold engine throughout — this should not rotate</td></tr>
+<tr><td>Frontend engineers</td><td class="c">2</td><td>Customer booking flow, then the two consoles</td></tr>
+<tr><td>Platform / DevOps</td><td class="c">1</td><td>Cluster, CI, observability, per-tenant infrastructure</td></tr>
+<tr><td>Product / QA</td><td class="c">1</td><td>Requirements, the isolation and concurrency suites</td></tr>
+</tbody></table>
+<p>The one staffing recommendation worth stating: keep a single named owner for the tenancy layer and the hold engine across the whole project. These are the two areas where a subtle misunderstanding is expensive and where consistency matters more than throughput.</p>

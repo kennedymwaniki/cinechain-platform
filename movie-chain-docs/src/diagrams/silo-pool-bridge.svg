@@ -1,0 +1,54 @@
+<svg viewBox="0 0 720 300" role="img">
+<g><text class="s-cap" x="0" y="11">SILO — dedicated</text>
+<rect class="b-dash" x="0" y="18" width="228" height="212" rx="6"/>
+<rect class="b-am" x="12" y="30" width="100" height="92" rx="4"/>
+<text class="s-hd mid-a" x="62" y="46">Tenant A</text>
+<rect class="b" x="20" y="54" width="84" height="18"/><text class="s-xs mid-a" x="62" y="66">own compute</text>
+<rect class="b" x="20" y="76" width="84" height="18"/><text class="s-xs mid-a" x="62" y="88">own database</text>
+<rect class="b" x="20" y="98" width="84" height="18"/><text class="s-xs mid-a" x="62" y="110">own cache</text>
+<rect class="b-gr" x="118" y="30" width="100" height="92" rx="4"/>
+<text class="s-hd mid-a" x="168" y="46">Tenant B</text>
+<rect class="b" x="126" y="54" width="84" height="18"/><text class="s-xs mid-a" x="168" y="66">own compute</text>
+<rect class="b" x="126" y="76" width="84" height="18"/><text class="s-xs mid-a" x="168" y="88">own database</text>
+<rect class="b" x="126" y="98" width="84" height="18"/><text class="s-xs mid-a" x="168" y="110">own cache</text>
+<text class="s-sm" x="12" y="142">Isolation   ●●●●●  by construction</text>
+<text class="s-sm" x="12" y="158">Cost        ●●●●●  worst</text>
+<text class="s-sm" x="12" y="174">Blast radius  one tenant only</text>
+<text class="s-sm" x="12" y="190">Noisy neighbour  impossible</text>
+<text class="s-sm" x="12" y="206">Ops effort   grows per tenant</text>
+<text class="s-xs" x="12" y="222">Use for: regulated, huge, or paying for it</text></g>
+
+<g><text class="s-capb" x="246" y="11">POOL — shared</text>
+<rect class="b-dashb" x="246" y="18" width="228" height="212" rx="6"/>
+<rect class="b-bl" x="258" y="30" width="200" height="92" rx="4"/>
+<text class="s-hd mid-a" x="358" y="46">One shared stack</text>
+<rect class="b" x="266" y="54" width="184" height="18"/><text class="s-xs mid-a" x="358" y="66">shared compute</text>
+<rect class="b" x="266" y="76" width="184" height="18"/><text class="s-xs mid-a" x="358" y="88">shared database — rows tagged tenant_id</text>
+<rect class="b" x="266" y="98" width="184" height="18"/><text class="s-xs mid-a" x="358" y="110">shared cache — keys prefixed tenant:</text>
+<text class="s-sm" x="258" y="142">Isolation   ●●○○○  by code + policy</text>
+<text class="s-sm" x="258" y="158">Cost        ●○○○○  best</text>
+<text class="s-sm" x="258" y="174">Blast radius  everyone</text>
+<text class="s-sm" x="258" y="190">Noisy neighbour  real, must be managed</text>
+<text class="s-sm" x="258" y="206">Ops effort   flat as you grow</text>
+<text class="s-xs" x="258" y="222">Use for: the long tail — your default</text></g>
+
+<g><text class="s-cap" x="492" y="11">BRIDGE — mixed</text>
+<rect class="b-dasha" x="492" y="18" width="228" height="212" rx="6"/>
+<rect class="b-bl" x="504" y="30" width="204" height="40" rx="4"/>
+<text class="s-lb mid-a" x="606" y="46">Shared compute (pooled)</text>
+<text class="s-xs mid-a" x="606" y="61">all tenants run on the same servers</text>
+<rect class="b-am" x="504" y="76" width="98" height="46" rx="4"/>
+<text class="s-xs mid-a" x="553" y="94">Tenant A</text><text class="s-xs mid-a" x="553" y="108">own database</text>
+<rect class="b-gr" x="610" y="76" width="98" height="46" rx="4"/>
+<text class="s-xs mid-a" x="659" y="94">Tenant B</text><text class="s-xs mid-a" x="659" y="108">own database</text>
+<text class="s-sm" x="504" y="142">Isolation   ●●●○○  strong where it counts</text>
+<text class="s-sm" x="504" y="158">Cost        ●●○○○  middling</text>
+<text class="s-sm" x="504" y="174">Blast radius  data safe, compute shared</text>
+<text class="s-sm" x="504" y="190">Noisy neighbour  possible on compute</text>
+<text class="s-sm" x="504" y="206">Ops effort   moderate</text>
+<text class="s-xs" x="504" y="222">Use for: &quot;our data cannot share a table&quot;</text></g>
+<rect class="b-w" x="0" y="242" width="720" height="50" rx="5"/>
+<text class="s-lb" x="14" y="260">These are not three products — they are three dials, set per layer.</text>
+<text class="s-sm" x="14" y="276">You can silo storage while pooling compute, pool everything for the free tier, and silo the whole stack for one bank.</text>
+<text class="s-sm" x="14" y="288">The same codebase serves all three. That is the whole trick.</text>
+</svg>

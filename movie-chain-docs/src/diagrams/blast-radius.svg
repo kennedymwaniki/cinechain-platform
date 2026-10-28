@@ -1,0 +1,41 @@
+<svg viewBox="0 0 720 230" role="img">
+<text class="s-cap" x="0" y="11">Blast radius — when something breaks, how many tenants feel it?</text>
+<rect class="b-dash" x="0" y="20" width="230" height="150" rx="6"/>
+<text class="s-hd mid-a" x="115" y="38">Full-stack silo</text>
+<circle cx="115" cy="96" r="30" fill="var(--red-wash)" stroke="var(--red)" stroke-width="1.5"/>
+<text class="s-xs mid-a" x="115" y="94">Tenant A</text><text class="s-xs mid-a" x="115" y="106">DOWN</text>
+<circle cx="52" cy="96" r="20" fill="var(--green-wash)" stroke="#bfe3d2"/><text class="s-xs mid-a" x="52" y="99">B ok</text>
+<circle cx="178" cy="96" r="20" fill="var(--green-wash)" stroke="#bfe3d2"/><text class="s-xs mid-a" x="178" y="99">C ok</text>
+<text class="s-sm mid-a" x="115" y="146">1 tenant affected</text>
+<text class="s-xs mid-a" x="115" y="160">Highest cost, smallest radius</text>
+
+<rect class="b-dash" x="245" y="20" width="230" height="150" rx="6"/>
+<text class="s-hd mid-a" x="360" y="38">Pod / cell</text>
+<rect x="262" y="60" width="90" height="72" rx="5" fill="var(--red-wash)" stroke="var(--red)" stroke-width="1.5"/>
+<text class="s-xs mid-a" x="307" y="76">Pod 1 — DOWN</text>
+<circle cx="285" cy="100" r="13" fill="#fff" stroke="var(--red)"/><text class="s-xs mid-a" x="285" y="103">A</text>
+<circle cx="329" cy="100" r="13" fill="#fff" stroke="var(--red)"/><text class="s-xs mid-a" x="329" y="103">B</text>
+<text class="s-xs mid-a" x="307" y="126">+ 48 more</text>
+<rect x="368" y="60" width="90" height="72" rx="5" fill="var(--green-wash)" stroke="#bfe3d2"/>
+<text class="s-xs mid-a" x="413" y="76">Pod 2 — fine</text>
+<circle cx="391" cy="100" r="13" fill="#fff" stroke="#bfe3d2"/><text class="s-xs mid-a" x="391" y="103">C</text>
+<circle cx="435" cy="100" r="13" fill="#fff" stroke="#bfe3d2"/><text class="s-xs mid-a" x="435" y="103">D</text>
+<text class="s-xs mid-a" x="413" y="126">+ 48 more</text>
+<text class="s-sm mid-a" x="360" y="146">50 tenants affected</text>
+<text class="s-xs mid-a" x="360" y="160">The deliberate middle ground</text>
+
+<rect class="b-dash" x="490" y="20" width="230" height="150" rx="6"/>
+<text class="s-hd mid-a" x="605" y="38">Full pool</text>
+<rect x="510" y="58" width="190" height="76" rx="5" fill="var(--red-wash)" stroke="var(--red)" stroke-width="1.5"/>
+<text class="s-xs mid-a" x="605" y="74">One shared stack — DOWN</text>
+<circle cx="545" cy="100" r="13" fill="#fff" stroke="var(--red)"/><text class="s-xs mid-a" x="545" y="103">A</text>
+<circle cx="578" cy="100" r="13" fill="#fff" stroke="var(--red)"/><text class="s-xs mid-a" x="578" y="103">B</text>
+<circle cx="611" cy="100" r="13" fill="#fff" stroke="var(--red)"/><text class="s-xs mid-a" x="611" y="103">C</text>
+<circle cx="644" cy="100" r="13" fill="#fff" stroke="var(--red)"/><text class="s-xs mid-a" x="644" y="103">D</text>
+<text class="s-xs mid-a" x="605" y="126">…and every other tenant</text>
+<text class="s-sm mid-a" x="605" y="146">All tenants affected</text>
+<text class="s-xs mid-a" x="605" y="160">Lowest cost, largest radius</text>
+<rect class="b-w" x="0" y="180" width="720" height="46" rx="5"/>
+<text class="s-lb" x="14" y="198">Blast radius is a business decision wearing an engineering costume.</text>
+<text class="s-sm" x="14" y="215">You are choosing, in advance, how bad your worst day is allowed to be — and how much you are willing to pay to cap it.</text>
+</svg>

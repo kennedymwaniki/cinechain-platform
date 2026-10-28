@@ -1,0 +1,55 @@
+<svg viewBox="0 0 720 400" role="img">
+<rect class="b-am" x="0" y="0" width="150" height="62" rx="4"/>
+<text class="s-hd" x="8" y="16">tenant</text><text class="s-mono" x="8" y="30">id (PK)</text><text class="s-mono" x="8" y="42">name, slug, tier</text><text class="s-mono" x="8" y="54">status, created_at</text>
+
+<rect class="b" x="0" y="78" width="150" height="62" rx="4"/>
+<text class="s-hd" x="8" y="94">theatre</text><text class="s-mono" x="8" y="108">id (PK)</text><text class="s-mono" x="8" y="120">tenant_id (FK)</text><text class="s-mono" x="8" y="132">name, city, timezone</text>
+
+<rect class="b" x="0" y="156" width="150" height="62" rx="4"/>
+<text class="s-hd" x="8" y="172">screen</text><text class="s-mono" x="8" y="186">id (PK)</text><text class="s-mono" x="8" y="198">tenant_id, theatre_id</text><text class="s-mono" x="8" y="210">name, format, capacity</text>
+
+<rect class="b" x="0" y="234" width="150" height="74" rx="4"/>
+<text class="s-hd" x="8" y="250">seat</text><text class="s-mono" x="8" y="264">id (PK)</text><text class="s-mono" x="8" y="276">tenant_id, screen_id</text><text class="s-mono" x="8" y="288">row_label, number</text><text class="s-mono" x="8" y="300">seat_class</text>
+
+<rect class="b-bl" x="200" y="78" width="160" height="74" rx="4"/>
+<text class="s-hd" x="208" y="94">film</text><text class="s-mono" x="208" y="108">id (PK)</text><text class="s-mono" x="208" y="120">tenant_id (FK)</text><text class="s-mono" x="208" y="132">title, runtime_min</text><text class="s-mono" x="208" y="144">rating, release_date</text>
+
+<rect class="b-bl" x="200" y="176" width="160" height="98" rx="4"/>
+<text class="s-hd" x="208" y="192">screening</text><text class="s-mono" x="208" y="206">id (PK)</text><text class="s-mono" x="208" y="218">tenant_id, screen_id</text><text class="s-mono" x="208" y="230">film_id (FK)</text><text class="s-mono" x="208" y="242">starts_at, ends_at</text><text class="s-mono" x="208" y="254">base_price, status</text>
+<text class="s-xs" x="208" y="268">the 4 showings a day live here</text>
+
+<rect class="b-am" x="410" y="176" width="172" height="110" rx="4"/>
+<text class="s-hd" x="418" y="192">seat_lock</text><text class="s-mono" x="418" y="206">screening_id (PK)</text><text class="s-mono" x="418" y="218">seat_id      (PK)</text><text class="s-mono" x="418" y="230">tenant_id</text><text class="s-mono" x="418" y="242">status HELD|SOLD</text><text class="s-mono" x="418" y="254">hold_id, expires_at</text><text class="s-mono" x="418" y="266">booking_id (nullable)</text>
+<text class="s-xs" x="418" y="280">one row = one seat at one showing</text>
+
+<rect class="b-gr" x="410" y="42" width="172" height="86" rx="4"/>
+<text class="s-hd" x="418" y="58">booking</text><text class="s-mono" x="418" y="72">id (PK)</text><text class="s-mono" x="418" y="84">tenant_id, screening_id</text><text class="s-mono" x="418" y="96">customer_id, status</text><text class="s-mono" x="418" y="108">total_amount, currency</text><text class="s-mono" x="418" y="120">reference, created_at</text>
+
+<rect class="b-gr" x="610" y="42" width="110" height="74" rx="4"/>
+<text class="s-hd" x="618" y="58">ticket</text><text class="s-mono" x="618" y="72">id (PK)</text><text class="s-mono" x="618" y="84">booking_id</text><text class="s-mono" x="618" y="96">seat_id, price</text><text class="s-mono" x="618" y="108">qr_code</text>
+
+<rect class="b-pu" x="610" y="176" width="110" height="74" rx="4"/>
+<text class="s-hd" x="618" y="192">payment</text><text class="s-mono" x="618" y="206">id (PK)</text><text class="s-mono" x="618" y="218">booking_id</text><text class="s-mono" x="618" y="230">provider, status</text><text class="s-mono" x="618" y="242">amount, ref</text>
+
+<rect class="b-pu" x="200" y="296" width="160" height="62" rx="4"/>
+<text class="s-hd" x="208" y="312">app_user</text><text class="s-mono" x="208" y="326">id (PK)</text><text class="s-mono" x="208" y="338">tenant_id, email</text><text class="s-mono" x="208" y="350">role, status</text>
+
+<path class="ln-a" d="M75 62 L75 78" marker-end="url(#ah-a)"/>
+<path class="ln-a" d="M75 140 L75 156" marker-end="url(#ah-a)"/>
+<path class="ln-a" d="M75 218 L75 234" marker-end="url(#ah-a)"/>
+<path class="ln-a" d="M150 31 L180 31 L180 112 L200 112" marker-end="url(#ah-a)"/>
+<path class="ln" d="M150 187 L175 187 L175 212 L200 212" marker-end="url(#ah)"/>
+<path class="ln" d="M280 152 L280 176" marker-end="url(#ah)"/>
+<path class="ln-r" d="M360 212 L410 212" marker-end="url(#ah-r)"/>
+<path class="ln-r" d="M150 271 L175 271 L175 330 L390 330 L390 250 L410 250" marker-end="url(#ah-r)"/>
+<path class="ln-g" d="M496 176 L496 128" marker-end="url(#ah-g)"/>
+<path class="ln-g" d="M582 80 L610 80" marker-end="url(#ah-g)"/>
+<path class="ln" d="M582 210 L610 210" marker-end="url(#ah)"/>
+<path class="ln" d="M360 320 L600 320 L600 128 L582 128" marker-end="url(#ah)"/>
+<text class="s-xs" x="84" y="74">1:N</text><text class="s-xs" x="84" y="152">1:N</text><text class="s-xs" x="84" y="230">1:N</text>
+<text class="s-xs" x="370" y="206">1:N</text><text class="s-xs" x="288" y="168">1:N</text>
+<rect class="b-rd" x="410" y="300" width="310" height="58" rx="5"/>
+<text class="s-hd" x="418" y="317">Read this diagram for one thing above all</text>
+<text class="s-sm" x="418" y="333">Every single table carries tenant_id — including the ones</text>
+<text class="s-sm" x="418" y="348">where it looks redundant. That redundancy is the isolation.</text>
+</svg>

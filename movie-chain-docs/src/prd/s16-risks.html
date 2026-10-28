@@ -1,0 +1,59 @@
+<h2><span class="num">16</span>Risks and Open Questions</h2>
+
+<h3>16.1 Risk register</h3>
+<table class="lg">
+<thead><tr><th style="width:24%">Risk</th><th style="width:9%">Likely</th><th style="width:9%">Impact</th><th>Mitigation</th></tr></thead>
+<tbody>
+<tr><td><b>Cross-tenant data exposure</b></td><td class="c"><span class="mid">Med</span></td><td class="c"><span class="no">Critical</span></td><td>Defence in depth: RLS <code>FORCE</code>d, non-owner role, generated isolation suite, 404-not-403, single connection path enforced by lint. Assume application code will eventually be wrong.</td></tr>
+<tr><td><b>Double-sold seats</b></td><td class="c"><span class="mid">Med</span></td><td class="c"><span class="no">High</span></td><td>Atomic <code>SET NX</code> plus a composite primary key in Postgres. Correctness never depends on the cache. Concurrency suite runs in CI.</td></tr>
+<tr><td><b>Noisy neighbour at on-sale</b></td><td class="c"><span class="no">High</span></td><td class="c"><span class="mid">Med</span></td><td>Per-tenant rate limits, separate pools, Redis-served seat maps, pre-scale procedure. Load test reproduces the skew, not just the volume.</td></tr>
+<tr><td><b>Payment provider instability</b></td><td class="c"><span class="no">High</span></td><td class="c"><span class="mid">Med</span></td><td>Idempotency keys everywhere, reconciliation job, automatic refund on lost seats, provider-agnostic interface so a second can be added.</td></tr>
+<tr><td><b>Redis loss during a sale</b></td><td class="c"><span class="mid">Low</span></td><td class="c"><span class="mid">Med</span></td><td>Postgres fallback path; sweeper interval reduced; no correctness dependency on Redis. Tested by killing Redis mid-run.</td></tr>
+<tr><td><b>Schema migrations at scale</b></td><td class="c"><span class="mid">Med</span></td><td class="c"><span class="mid">Med</span></td><td>Pooled model means one migration for most tenants. Siloed tenants migrate through an orchestrated, resumable runner with per-tenant status.</td></tr>
+<tr><td><b>Cost per tenant unknown</b></td><td class="c"><span class="mid">Med</span></td><td class="c"><span class="mid">Med</span></td><td>Metering from P3, before pricing hardens. An approximate model beats none.</td></tr>
+<tr><td><b>Tier logic leaking into code</b></td><td class="c"><span class="no">High</span></td><td class="c"><span class="mid">Med</span></td><td>Explicit definition-of-done check; periodic grep for tier names outside configuration. This one degrades slowly and is easy to miss.</td></tr>
+<tr><td><b>Consumer identity leaks across chains</b></td><td class="c"><span class="mid">Low</span></td><td class="c"><span class="no">High</span></td><td><code>platform.consumer</code> is outside the RLS loop by design, so it is guarded structurally instead: one owning service, a distinct database role, no joins from application-plane code, and a test asserting a tenant-scoped connection cannot read it (§13.1).</td></tr>
+<tr><td><b>Tenant boundary proves wrong</b></td><td class="c"><span class="yes">Low</span></td><td class="c"><span class="no">Critical</span></td><td>Validate with three real chains before P1 closes. This is the one risk with no cheap remedy after launch.</td></tr>
+</tbody></table>
+
+<h3>16.2 Resolved — customer identity</h3>
+<p>An earlier draft of this document listed &ldquo;can one person hold accounts at two chains with the same e-mail?&rdquo; as an open question, and answered it in the body by saying such a customer would simply register twice. <b>That answer was wrong, and the reasoning behind it was wrong.</b></p>
+<div class="box warn"><span class="bt">What the earlier draft got wrong, and why it matters</span>
+<p>It claimed that linking a customer's identities across chains would create the very cross-tenant join the architecture exists to prevent. It would not. The link is safe precisely <em>because</em> <code>platform.consumer</code> sits outside the tenant boundary and no tenant-scoped query can reach it (§6.2).</p>
+<p>The practical cost of the earlier position was worse than the duplicated registration it accepted: a customer of Nyati travelling to a town served only by Prestige would have been <b>unable to book at all</b>, because their token asserted a tenant they were not transacting with.</p>
+<p><b>Resolved:</b> one global consumer identity, carrying no tenant claim; guest checkout as the primary path; per-chain loyalty on <code>tenant_customer</code>. Specified in §4.2, §5.0 and §6.2.</p></div>
+
+<h3>16.3 Open questions</h3>
+<p>These require a decision from outside the engineering team. Each is listed with the consequence of deciding late.</p>
+<table>
+<thead><tr><th style="width:34%">Question</th><th style="width:20%">Needed by</th><th>Why it cannot drift</th></tr></thead>
+<tbody>
+<tr><td><b>Should guest bookings expire from the platform consumer directory if never converted?</b></td><td>Before P2 ends</td><td>A guest who never registers leaves a <code>tenant_customer</code> row with no <code>consumer_id</code>. Retention of those rows is a data-protection question, not a technical one.</td></tr>
+<tr><td><b>Does any target customer have a data-residency or dedicated-key requirement?</b></td><td>Before P1 ends</td><td>Decides whether the Dedicated tier is needed in v1 or can wait until P4.</td></tr>
+<tr><td><b>Who is the data controller for moviegoer data — the chain or the platform?</b></td><td>Before P2 ends</td><td>Shapes consent flows, the deletion path and the contract. A legal question with a schema consequence.</td></tr>
+<tr><td><b>Is 5 minutes the right hold window for M-Pesa?</b></td><td>Validate in P2</td><td>M-Pesa requires handset confirmation. If the real distribution is longer, the default must move before launch.</td></tr>
+<tr><td><b>Do chains want to share a film catalogue, or curate their own?</b></td><td>Before P1 ends</td><td>Currently <code>film</code> is tenant-scoped. A shared catalogue would introduce a genuinely global table, which is a deliberate hole in the isolation model and needs designing rather than discovering.</td></tr>
+<tr><td><b>Is seat-gap prevention (FR-47) commercially important?</b></td><td><b>Resolved</b></td><td>Yes on sell-out nights, no on quiet ones. Demand drives it: the rule activates above a per-tenant occupancy threshold, as a pure pre-check before the atomic acquire, so the hold algorithm itself is unchanged (implementation plan, step 13).</td></tr>
+</tbody></table>
+
+<div class="box note"><span class="bt">On the film catalogue question</span>
+<p>It is worth flagging because it is the only place in this design where a global, cross-tenant table is plausibly correct. Films are objectively the same object for every chain: <em>Avengers: Doomsday</em> has one runtime and one certificate regardless of who screens it.</p>
+<p>If that path is taken, the right shape is a global <code>film_catalogue</code> that is read-only to tenants, with a tenant-scoped <code>film</code> record referencing it for pricing and local metadata. What must be avoided is a shared table that tenants can write to — that is a cross-tenant write path, and it would be the single weakest point in an otherwise strict model.</p></div>
+
+<h3>16.4 Appendix — the isolation checklist</h3>
+<p>Extracted for use in code review. If a change touches data access, it should be walked through.</p>
+<ul class="check">
+<li>Tenant identity comes from the verified token for staff, and from the resource for consumers — never from a caller-supplied tenant value.</li>
+<li>A consumer token cannot reach a staff endpoint, and a staff token cannot reach a consumer endpoint. Both are 403 and logged.</li>
+<li><code>consumer_id</code> is never returned to a tenant, and no tenant-scoped query joins to <code>platform.consumer</code>.</li>
+<li>A missing tenant claim results in rejection, never a default.</li>
+<li>A tenant named in the URL is validated against the token, and a mismatch returns 404.</li>
+<li>The table has <code>tenant_id</code>, RLS enabled, <code>FORCE</code>d, and both <code>USING</code> and <code>WITH CHECK</code>.</li>
+<li>The connection is obtained through the single tenancy provider, and <code>SET LOCAL</code> runs on that same connection.</li>
+<li>The application role is not the table owner and does not have <code>BYPASSRLS</code>.</li>
+<li>Cache keys, queue names and storage paths carry the tenant prefix.</li>
+<li>Background jobs set tenant context from their payload before touching data.</li>
+<li>Any job that deliberately runs platform-wide is one of the two approved exceptions.</li>
+<li>Errors do not disclose the existence of another tenant's resources.</li>
+<li>Logs carry the tenant label and no personal data.</li>
+</ul>

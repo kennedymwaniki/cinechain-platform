@@ -1,0 +1,50 @@
+<h2><span class="num">9</span>Non-Functional Requirements</h2>
+
+<h3>9.1 Performance</h3>
+<table>
+<thead><tr><th style="width:34%">Operation</th><th style="width:12%">p50</th><th style="width:12%">p95</th><th style="width:12%">p99</th><th>Note</th></tr></thead>
+<tbody>
+<tr><td>Seat-map read</td><td class="c">40 ms</td><td class="c">200 ms</td><td class="c">400 ms</td><td>Cached; the most frequent request in the system</td></tr>
+<tr><td>Hold acquisition</td><td class="c">60 ms</td><td class="c">250 ms</td><td class="c">400 ms</td><td>The interaction customers judge the product by</td></tr>
+<tr><td>Booking confirmation</td><td class="c">800 ms</td><td class="c">2.5 s</td><td class="c">5 s</td><td>Dominated by the payment provider, not by us</td></tr>
+<tr><td>Ticket scan</td><td class="c">50 ms</td><td class="c">150 ms</td><td class="c">300 ms</td><td>A queue forms behind anything slower</td></tr>
+<tr><td>Film listing</td><td class="c">80 ms</td><td class="c">300 ms</td><td class="c">600 ms</td><td>Cacheable at the edge</td></tr>
+<tr><td>Chain-wide report</td><td class="c">1 s</td><td class="c">4 s</td><td class="c">10 s</td><td>Async with progress beyond 10 s</td></tr>
+</tbody></table>
+
+<h3>9.2 Scale targets</h3>
+<div class="grid3">
+<div class="card"><div class="stat">200</div><div class="stat-l">Tenants, year 2</div><p class="s-sm">~190 pooled, ~8 bridged, ~2 dedicated.</p></div>
+<div class="card"><div class="stat">3 000</div><div class="stat-l">Concurrent seat selections</div><p class="s-sm">Across the platform, at a blockbuster on-sale.</p></div>
+<div class="card"><div class="stat">800/s</div><div class="stat-l">Peak hold attempts</div><p class="s-sm">Heavily concentrated in one tenant — the noisy-neighbour case.</p></div>
+</div>
+<p>The design load is deliberately skewed. A realistic peak is not 800 evenly distributed requests per second; it is 760 requests per second from Nyati and 40 from everyone else combined. Capacity planning and load testing must both reflect that shape, because a system tuned for an even distribution fails in exactly the scenario it will meet.</p>
+
+<h3>9.3 Availability</h3>
+<table>
+<thead><tr><th style="width:30%">Capability</th><th style="width:14%">Target</th><th>Degradation strategy</th></tr></thead>
+<tbody>
+<tr><td>Browsing and seat maps</td><td class="c">99.9%</td><td>Serve from cache with a staleness notice</td></tr>
+<tr><td>Holds and bookings</td><td class="c">99.9%</td><td>No graceful degradation possible — this must simply work</td></tr>
+<tr><td>Ticket scanning</td><td class="c">99.95%</td><td>Highest target: an audience is physically queuing</td></tr>
+<tr><td>Reporting</td><td class="c">99.0%</td><td>Fully deferrable; must never share a connection pool with booking</td></tr>
+<tr><td>Onboarding (control plane)</td><td class="c">99.0%</td><td>Resumable; an outage delays sign-ups but affects no trading tenant</td></tr>
+</tbody></table>
+
+<h3>9.4 Security and compliance</h3>
+<table>
+<thead><tr><th style="width:24%">Requirement</th><th>Implementation</th></tr></thead>
+<tbody>
+<tr><td><b>Tenant isolation</b><span class="cite">G ch. 9, pp. 219&ndash;242</span><span class="cite g2">AWS — Tenant Isolation Strategies</span></td><td>Row-level security on every tenant-scoped table, <code>FORCE</code>d, with the application connecting as a non-owner role. Verified by an automated test suite that attempts cross-tenant access on every endpoint.</td></tr>
+<tr><td><b>Transport</b></td><td>TLS 1.2+ everywhere, including between services inside the cluster.</td></tr>
+<tr><td><b>At rest</b></td><td>Volume encryption for all databases. Dedicated-tier tenants may supply their own key.</td></tr>
+<tr><td><b>Card data</b></td><td>Never touches our servers. Provider-hosted fields only; we store a token and the last four digits. This keeps PCI scope at SAQ-A.</td></tr>
+<tr><td><b>Ticket codes</b></td><td>Signed, high-entropy, stored as a hash. Not sequential and not enumerable.</td></tr>
+<tr><td><b>Personal data</b></td><td>Kenya's Data Protection Act 2019 applies. The tenant is the data controller; the platform is the processor. Contract must reflect this, and the data-deletion path in FR-8 is how we meet it.</td></tr>
+<tr><td><b>Audit</b></td><td>Every administrative action, tier change, refund and cross-tenant support access is logged immutably with actor, time and tenant.</td></tr>
+<tr><td><b>Secrets</b></td><td>No credentials in images or environment files committed to source. Per-tenant database credentials for siloed tenants are stored in the secret manager and mounted at runtime.</td></tr>
+</tbody></table>
+
+<div class="box warn"><span class="bt">The support-access problem, stated honestly</span>
+<p>Sooner or later a tenant will report a bug that cannot be diagnosed without looking at their data. Because operators deliberately have no such access, a mechanism is required — and if one is not designed, someone will eventually be granted a production database password, which is the worst possible version of it.</p>
+<p>The designed mechanism: a tenant admin grants time-boxed support access from their own console. It expires automatically, defaults to two hours, is limited to named support staff, records every query executed under it, and is visible to the tenant afterwards. Access is never granted by the platform to itself.</p></div>

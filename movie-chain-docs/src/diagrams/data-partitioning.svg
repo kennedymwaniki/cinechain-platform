@@ -1,0 +1,50 @@
+<svg viewBox="0 0 720 330" role="img">
+<text class="s-cap" x="0" y="11">Three ways to keep tenants' data apart — strongest separation on the left, cheapest on the right</text>
+
+<g><rect class="b-dash" x="0" y="22" width="228" height="196" rx="6"/>
+<text class="s-hd mid-a" x="114" y="42">Database per tenant</text>
+<rect class="b-am" x="16" y="54" width="92" height="66" rx="4"/><text class="s-xs mid-a" x="62" y="72">nyati_db</text>
+<rect class="b" x="24" y="80" width="76" height="14"/><text class="s-xs mid-a" x="62" y="91">bookings</text>
+<rect class="b" x="24" y="98" width="76" height="14"/><text class="s-xs mid-a" x="62" y="109">seats</text>
+<rect class="b-gr" x="120" y="54" width="92" height="66" rx="4"/><text class="s-xs mid-a" x="166" y="72">prestige_db</text>
+<rect class="b" x="128" y="80" width="76" height="14"/><text class="s-xs mid-a" x="166" y="91">bookings</text>
+<rect class="b" x="128" y="98" width="76" height="14"/><text class="s-xs mid-a" x="166" y="109">seats</text>
+<text class="s-sm" x="16" y="140">✓  Separate backup &amp; restore</text>
+<text class="s-sm" x="16" y="155">✓  Own encryption key possible</text>
+<text class="s-sm" x="16" y="170">✓  Easiest compliance answer</text>
+<text class="s-sm" x="16" y="185">✗  500 tenants = 500 databases</text>
+<text class="s-sm" x="16" y="200">✗  Schema migration × 500</text>
+<text class="s-xs" x="16" y="213">Wrong query hits nothing — the DB isn't even connected</text></g>
+
+<g><rect class="b-dash" x="246" y="22" width="228" height="196" rx="6"/>
+<text class="s-hd mid-a" x="360" y="42">Schema per tenant</text>
+<rect class="b-bl" x="258" y="54" width="204" height="66" rx="4"/><text class="s-xs mid-a" x="360" y="70">ONE database</text>
+<rect class="b-am" x="266" y="78" width="92" height="36" rx="3"/><text class="s-xs mid-a" x="312" y="92">schema nyati</text><text class="s-xs mid-a" x="312" y="106">bookings, seats</text>
+<rect class="b-gr" x="364" y="78" width="90" height="36" rx="3"/><text class="s-xs mid-a" x="409" y="92">schema prestige</text><text class="s-xs mid-a" x="409" y="106">bookings, seats</text>
+<text class="s-sm" x="258" y="140">✓  One server, one connection pool</text>
+<text class="s-sm" x="258" y="155">✓  Clear mental separation</text>
+<text class="s-sm" x="258" y="170">✓  Per-tenant restore still doable</text>
+<text class="s-sm" x="258" y="185">✗  Migrations still run per schema</text>
+<text class="s-sm" x="258" y="200">✗  Postgres strains past ~1000</text>
+<text class="s-xs" x="258" y="213">A good middle stop — and a trap at scale</text></g>
+
+<g><rect class="b-dasha" x="492" y="22" width="228" height="196" rx="6"/>
+<text class="s-hd mid-a" x="606" y="42">Shared table + tenant_id</text>
+<rect class="b-am" x="504" y="54" width="204" height="66" rx="4"/>
+<text class="s-xs mid-a" x="606" y="69">ONE table: booking</text>
+<rect class="b" x="512" y="76" width="188" height="13"/><text class="s-mono" x="518" y="86">nyati    | seat A12 | CONFIRMED</text>
+<rect class="b" x="512" y="91" width="188" height="13"/><text class="s-mono" x="518" y="101">prestige | seat C04 | HELD</text>
+<rect class="b" x="512" y="106" width="188" height="13"/><text class="s-mono" x="518" y="116">nyati    | seat B07 | CONFIRMED</text>
+<text class="s-sm" x="504" y="140">✓  One migration, ever</text>
+<text class="s-sm" x="504" y="155">✓  Scales to 100 000 tenants</text>
+<text class="s-sm" x="504" y="170">✓  Cheapest by a wide margin</text>
+<text class="s-sm" x="504" y="185">✗  One bad query leaks everything</text>
+<text class="s-sm" x="504" y="200">✗  Needs RLS + discipline</text>
+<text class="s-xs" x="504" y="213">Your default — with the safety net below</text></g>
+
+<rect class="b-n" x="0" y="234" width="720" height="86" rx="6"/>
+<text class="s-hdw" x="14" y="254">How to choose — in one breath</text>
+<text class="s-smw" x="14" y="274">Start every table pooled with a tenant_id and row-level security. Move a tenant to its own database only when something forces you:</text>
+<text class="s-smw" x="14" y="289">a regulator, a contract, an encryption-key demand, or a customer so large their traffic distorts everyone else's.</text>
+<text class="s-smw" x="14" y="304">Design so that this move is a configuration change, not a rewrite. That is what &quot;the same code serves both&quot; really means.</text>
+</svg>

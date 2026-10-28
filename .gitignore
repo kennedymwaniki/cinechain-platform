@@ -1,0 +1,21 @@
+# dependencies
+node_modules/
+
+# docs build
+movie-chain-docs/*
+movie-chain-docs/build/.render-*.html
+movie-chain-docs/build/.cover-*.pdf
+movie-chain-docs/build/.body-*.pdf
+
+# api build
+movie-chain-api/dist/
+movie-chain-api/.env
+movie-chain-api/coverage/
+
+# editors / os
+.DS_Store
+*.swp
+
+# local agent tooling and working notes — not part of the repository
+.claude/
+IMPLEMENTATION-PLAN.md

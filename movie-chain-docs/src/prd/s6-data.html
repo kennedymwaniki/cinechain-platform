@@ -1,0 +1,348 @@
+<h2><span class="num">6</span>Domain and Data Design</h2>
+<p class="lede">The schema is the most durable artefact in this project. Everything in this section is technology-neutral PostgreSQL and applies identically to both editions of this document.</p>
+
+<figure class="fig-wide">{{d:domain-erd}}<figcaption><b>Figure 6.1.</b> The core entity model. Every tenant-scoped table carries <code>tenant_id</code>, including those where it is derivable through a foreign key — that redundancy is what makes row-level security possible on every table independently.</figcaption></figure>
+
+<h3>6.1 The tenancy columns</h3>
+<p>Two rules govern every table in the application plane, and they are not negotiable:</p>
+<ol>
+<li>The table carries a <code>tenant_id uuid NOT NULL</code> column.</li>
+<li>Row-level security is enabled on the table with an isolation policy, and the application role cannot bypass it.</li>
+</ol>
+<p>Rule 1 attracts an objection worth answering. <code>seat</code> already links to <code>screen</code>, which links to <code>theatre</code>, which carries <code>tenant_id</code> — so storing it again on <code>seat</code> is denormalised. That is true and it is the right trade. Without the column on every table, a row-level policy on <code>seat</code> would have to join three tables to evaluate, which is both slow and fragile. The denormalisation buys an independent, cheap, locally-evaluable security policy on every table. It is the single most valuable duplicate column in the schema.</p>
+
+<div class="code-label">Tenant registry — control plane</div>
+<pre><code><span class="kw">CREATE TYPE</span> tenant_tier <span class="kw">AS ENUM</span> (<span class="st">'basic'</span>, <span class="st">'standard'</span>, <span class="st">'premium'</span>, <span class="st">'dedicated'</span>);
+<span class="kw">CREATE TYPE</span> tenant_status <span class="kw">AS ENUM</span> (<span class="st">'pending'</span>,<span class="st">'provisioning'</span>,<span class="st">'active'</span>,<span class="st">'suspended'</span>,<span class="st">'offboarding'</span>);
+
+<span class="kw">CREATE TABLE</span> tenant (
+  id            uuid <span class="kw">PRIMARY KEY DEFAULT</span> gen_random_uuid(),
+  slug          text <span class="kw">NOT NULL UNIQUE</span>,          <span class="cm">-- 'nyati' -> nyati.cinechain.app</span>
+  name          text <span class="kw">NOT NULL</span>,
+  tier          tenant_tier   <span class="kw">NOT NULL DEFAULT</span> <span class="st">'basic'</span>,
+  status        tenant_status <span class="kw">NOT NULL DEFAULT</span> <span class="st">'pending'</span>,
+  country       char(2) <span class="kw">NOT NULL DEFAULT</span> <span class="st">'KE'</span>,
+  <span class="cm">-- where this tenant's data lives; NULL means the shared pool</span>
+  db_ref        text,
+  hold_seconds  int  <span class="kw">NOT NULL DEFAULT</span> 300 <span class="kw">CHECK</span> (hold_seconds <span class="kw">BETWEEN</span> 120 <span class="kw">AND</span> 900),
+  max_seats_per_booking int <span class="kw">NOT NULL DEFAULT</span> 10,
+  created_at    timestamptz <span class="kw">NOT NULL DEFAULT</span> now()
+);</code></pre>
+<p>Note <code>db_ref</code>. This single nullable column is what allows a tenant to be promoted from the pooled database to a dedicated one without any application change: the connection resolver reads it, and everything downstream is identical.</p>
+
+<h3>6.2 Identity — two tables on opposite sides of the boundary</h3>
+<p>This is where §4.2's three populations become schema. Staff are tenant-scoped and behave like every other tenant table. Consumers are not, and must not be.</p>
+
+<div class="code-label">Staff — tenant-scoped, RLS applies</div>
+<pre><code><span class="cm">-- Formerly 'app_user'. Renamed so the distinction is unmissable.</span>
+<span class="kw">CREATE TABLE</span> staff_user (
+  id         uuid <span class="kw">PRIMARY KEY DEFAULT</span> gen_random_uuid(),
+  tenant_id  uuid <span class="kw">NOT NULL</span>,          <span class="cm">-- always present; never null</span>
+  email      citext <span class="kw">NOT NULL</span>,
+  role       text <span class="kw">NOT NULL</span>,           <span class="cm">-- box_office | theatre_manager | chain_admin</span>
+  theatre_id uuid,                     <span class="cm">-- null = whole chain</span>
+  status     text <span class="kw">NOT NULL DEFAULT</span> <span class="st">'active'</span>,
+  <span class="cm">-- unique WITHIN a chain: the same person may work for two chains,</span>
+  <span class="cm">-- and gets a separate account at each. That is correct — see §4.2.</span>
+  <span class="kw">UNIQUE</span> (tenant_id, email)
+);</code></pre>
+
+<div class="code-label">Consumers — platform-level, OUTSIDE the tenant boundary</div>
+<pre><code><span class="kw">CREATE SCHEMA</span> platform;
+
+<span class="cm">-- No tenant_id. No RLS policy. Not in the RLS loop in §6.5.</span>
+<span class="cm">-- Reachable ONLY through the identity service, never from a</span>
+<span class="cm">-- tenant-scoped query. This is a deliberate exception (see below).</span>
+<span class="kw">CREATE TABLE</span> platform.consumer (
+  id           uuid <span class="kw">PRIMARY KEY DEFAULT</span> gen_random_uuid(),
+  email        citext <span class="kw">NOT NULL UNIQUE</span>,   <span class="cm">-- one person, one account, globally</span>
+  phone        text,
+  display_name text,
+  status       text <span class="kw">NOT NULL DEFAULT</span> <span class="st">'active'</span>,
+  created_at   timestamptz <span class="kw">NOT NULL DEFAULT</span> now()
+);
+
+<span class="cm">-- The per-chain projection: what THIS chain knows about a customer,</span>
+<span class="cm">-- because that customer transacted with THIS chain. Fully RLS-guarded.</span>
+<span class="kw">CREATE TABLE</span> tenant_customer (
+  tenant_id      uuid <span class="kw">NOT NULL</span>,
+  consumer_id    uuid,                  <span class="cm">-- NULL for guest purchases</span>
+  email          citext <span class="kw">NOT NULL</span>,
+  display_name   text,
+  loyalty_points int <span class="kw">NOT NULL DEFAULT</span> 0,
+  first_seen_at  timestamptz <span class="kw">NOT NULL DEFAULT</span> now(),
+  <span class="cm">-- keyed on email so a guest who later registers is linked (FR-77)</span>
+  <span class="kw">PRIMARY KEY</span> (tenant_id, email)
+);</code></pre>
+
+<div class="box key"><span class="bt">Why this satisfies both FR-75 and FR-79</span>
+<p><b>FR-75 — Grace books anywhere.</b> Her token carries a consumer id and no tenant claim, so nothing scopes her to a chain. The tenant of each purchase is derived from the screening she chose.</p>
+<p><b>FR-79 — no chain can see she uses another.</b> A chain reads <code>tenant_customer</code>, which RLS scopes to its own rows. <code>platform.consumer</code> is not in the RLS loop because it is not reachable from tenant-scoped code at all — a different database role and a different service own it. There is no query a chain can write that crosses from their row to another chain's.</p></div>
+
+<div class="box warn"><span class="bt">The deliberate exception, named so it cannot be forgotten</span>
+<p><code>platform.consumer</code> is a cross-tenant table in an otherwise strict model. Alongside the sweeper and the metering aggregator (§12.5), it is one of the few places that deliberately sits outside tenant isolation. It must therefore be: reachable through exactly one service, never joined to from application-plane code, covered by a test asserting a tenant-scoped connection cannot read it, and reviewed as security-sensitive.</p>
+<p>A practical corollary for the API layer: <b>never return <code>consumer_id</code> to a tenant.</b> It is an internal join key. The same opaque identifier visible to two chains is exactly the raw material for the correlation FR-79 forbids.</p></div>
+
+<h3>6.3 Application-plane tables</h3>
+<div class="code-label">Venue hierarchy</div>
+<pre><code><span class="kw">CREATE TABLE</span> theatre (
+  id         uuid <span class="kw">PRIMARY KEY DEFAULT</span> gen_random_uuid(),
+  tenant_id  uuid <span class="kw">NOT NULL</span>,
+  name       text <span class="kw">NOT NULL</span>,
+  city       text <span class="kw">NOT NULL</span>,
+  timezone   text <span class="kw">NOT NULL DEFAULT</span> <span class="st">'Africa/Nairobi'</span>,
+  <span class="cm">-- names unique WITHIN a tenant, never globally</span>
+  <span class="kw">UNIQUE</span> (tenant_id, name)
+);
+
+<span class="kw">CREATE TABLE</span> screen (
+  id         uuid <span class="kw">PRIMARY KEY DEFAULT</span> gen_random_uuid(),
+  tenant_id  uuid <span class="kw">NOT NULL</span>,
+  theatre_id uuid <span class="kw">NOT NULL REFERENCES</span> theatre(id) <span class="kw">ON DELETE RESTRICT</span>,
+  name       text <span class="kw">NOT NULL</span>,
+  format     text <span class="kw">NOT NULL DEFAULT</span> <span class="st">'standard'</span>,
+  <span class="kw">UNIQUE</span> (tenant_id, theatre_id, name)
+);
+
+<span class="kw">CREATE TABLE</span> seat (
+  id         uuid <span class="kw">PRIMARY KEY DEFAULT</span> gen_random_uuid(),
+  tenant_id  uuid <span class="kw">NOT NULL</span>,
+  screen_id  uuid <span class="kw">NOT NULL REFERENCES</span> screen(id) <span class="kw">ON DELETE RESTRICT</span>,
+  row_label  text <span class="kw">NOT NULL</span>,              <span class="cm">-- 'A', 'B', 'AA'</span>
+  seat_number int <span class="kw">NOT NULL</span>,
+  seat_class text <span class="kw">NOT NULL DEFAULT</span> <span class="st">'standard'</span>,
+  is_active  boolean <span class="kw">NOT NULL DEFAULT</span> true,   <span class="cm">-- false = removed / aisle gap</span>
+  <span class="kw">UNIQUE</span> (screen_id, row_label, seat_number)
+);</code></pre>
+
+<div class="code-label">Catalogue and scheduling</div>
+<pre><code><span class="kw">CREATE TABLE</span> film (
+  id          uuid <span class="kw">PRIMARY KEY DEFAULT</span> gen_random_uuid(),
+  tenant_id   uuid <span class="kw">NOT NULL</span>,
+  title       text <span class="kw">NOT NULL</span>,
+  runtime_min int  <span class="kw">NOT NULL CHECK</span> (runtime_min <span class="kw">BETWEEN</span> 1 <span class="kw">AND</span> 600),
+  rating      text, language text, poster_url text,
+  release_date date
+);
+
+<span class="kw">CREATE TYPE</span> screening_status <span class="kw">AS ENUM</span>
+  (<span class="st">'draft'</span>,<span class="st">'published'</span>,<span class="st">'closed'</span>,<span class="st">'completed'</span>,<span class="st">'cancelled'</span>);
+
+<span class="kw">CREATE TABLE</span> screening (
+  id         uuid <span class="kw">PRIMARY KEY DEFAULT</span> gen_random_uuid(),
+  tenant_id  uuid <span class="kw">NOT NULL</span>,
+  screen_id  uuid <span class="kw">NOT NULL REFERENCES</span> screen(id),
+  film_id    uuid <span class="kw">NOT NULL REFERENCES</span> film(id),
+  starts_at  timestamptz <span class="kw">NOT NULL</span>,
+  ends_at    timestamptz <span class="kw">NOT NULL</span>,
+  base_price_minor int <span class="kw">NOT NULL</span>,          <span class="cm">-- cents; never floats for money</span>
+  currency   char(3) <span class="kw">NOT NULL DEFAULT</span> <span class="st">'KES'</span>,
+  status     screening_status <span class="kw">NOT NULL DEFAULT</span> <span class="st">'draft'</span>,
+  <span class="kw">CHECK</span> (ends_at &gt; starts_at)
+);
+
+<span class="cm">-- FR-22: the database itself refuses overlapping screenings on one screen.</span>
+<span class="cm">-- Application-level checks race; an exclusion constraint cannot.</span>
+<span class="kw">CREATE EXTENSION IF NOT EXISTS</span> btree_gist;
+<span class="kw">ALTER TABLE</span> screening <span class="kw">ADD CONSTRAINT</span> no_screen_overlap
+  <span class="kw">EXCLUDE USING</span> gist (
+    screen_id <span class="kw">WITH</span> =,
+    tstzrange(starts_at, ends_at + interval <span class="st">'20 minutes'</span>) <span class="kw">WITH</span> &amp;&amp;
+  ) <span class="kw">WHERE</span> (status &lt;&gt; <span class="st">'cancelled'</span>);</code></pre>
+
+<div class="box key"><span class="bt">Why the exclusion constraint matters</span>
+<p>FR-22 says overlapping screenings must be rejected. The obvious implementation — query for conflicts, then insert if none — is the same check-then-act race described in §7.2. Two managers scheduling simultaneously can both see no conflict and both insert.</p>
+<p>The exclusion constraint makes the guarantee structural. It is the same principle as the seat lock, applied to a different resource: <em>collapse the check and the act into one operation the database guarantees is indivisible.</em></p></div>
+
+<h3>6.4 The seat lock table</h3>
+<p>This is the table the entire booking flow turns on. One row represents one seat at one screening.</p>
+<div class="code-label">Seat locks, bookings and tickets</div>
+<pre><code><span class="kw">CREATE TYPE</span> lock_status <span class="kw">AS ENUM</span> (<span class="st">'held'</span>, <span class="st">'sold'</span>);
+
+<span class="kw">CREATE TABLE</span> seat_lock (
+  screening_id uuid <span class="kw">NOT NULL REFERENCES</span> screening(id) <span class="kw">ON DELETE CASCADE</span>,
+  seat_id      uuid <span class="kw">NOT NULL REFERENCES</span> seat(id),
+  tenant_id    uuid <span class="kw">NOT NULL</span>,
+  status       lock_status <span class="kw">NOT NULL</span>,
+  hold_id      uuid,                    <span class="cm">-- who owns the hold</span>
+  expires_at   timestamptz,             <span class="cm">-- NULL once sold</span>
+  booking_id   uuid,
+  created_at   timestamptz <span class="kw">NOT NULL DEFAULT</span> now(),
+  <span class="cm">-- THE guarantee: one seat, one screening, one row. Cannot be violated.</span>
+  <span class="kw">PRIMARY KEY</span> (screening_id, seat_id),
+  <span class="kw">CHECK</span> (status = <span class="st">'sold'</span> <span class="kw">OR</span> expires_at <span class="kw">IS NOT NULL</span>)
+);
+
+<span class="kw">CREATE TYPE</span> booking_status <span class="kw">AS ENUM</span>
+  (<span class="st">'pending'</span>,<span class="st">'confirmed'</span>,<span class="st">'cancelled'</span>,<span class="st">'refunded'</span>,<span class="st">'expired'</span>);
+
+<span class="kw">CREATE TABLE</span> booking (
+  id           uuid <span class="kw">PRIMARY KEY DEFAULT</span> gen_random_uuid(),
+  tenant_id    uuid <span class="kw">NOT NULL</span>,
+  screening_id uuid <span class="kw">NOT NULL REFERENCES</span> screening(id),
+  <span class="cm">-- who bought it. consumer_id is NULL for guest purchases (FR-70);</span>
+  <span class="cm">-- the contact details are captured at payment either way and are</span>
+  <span class="cm">-- the immutable record of the transaction.</span>
+  consumer_id  uuid,
+  guest_email  citext <span class="kw">NOT NULL</span>,
+  guest_name   text <span class="kw">NOT NULL</span>,
+  guest_phone  text,
+  status       booking_status <span class="kw">NOT NULL DEFAULT</span> <span class="st">'pending'</span>,
+  total_minor  int <span class="kw">NOT NULL</span>,
+  currency     char(3) <span class="kw">NOT NULL DEFAULT</span> <span class="st">'KES'</span>,
+  reference    text <span class="kw">NOT NULL</span>,
+  created_at   timestamptz <span class="kw">NOT NULL DEFAULT</span> now(),
+  <span class="cm">-- unique WITHIN the tenant: two chains may both issue 'NYT-4471'</span>
+  <span class="kw">UNIQUE</span> (tenant_id, reference)
+);
+
+<span class="kw">CREATE TABLE</span> ticket (
+  id          uuid <span class="kw">PRIMARY KEY DEFAULT</span> gen_random_uuid(),
+  tenant_id   uuid <span class="kw">NOT NULL</span>,
+  booking_id  uuid <span class="kw">NOT NULL REFERENCES</span> booking(id) <span class="kw">ON DELETE CASCADE</span>,
+  seat_id     uuid <span class="kw">NOT NULL REFERENCES</span> seat(id),
+  price_minor int  <span class="kw">NOT NULL</span>,          <span class="cm">-- captured at purchase, never recomputed</span>
+  code_hash   text <span class="kw">NOT NULL UNIQUE</span>,   <span class="cm">-- store the hash, not the code</span>
+  redeemed_at timestamptz,
+  redeemed_by uuid
+);</code></pre>
+
+<h3>6.5 Isolation policy</h3>
+<p>The policy<span class="cite g2">PostgreSQL — CREATE POLICY</span><span class="cite g2">Crunchy Data — RLS for tenants</span> is mechanical and identical on every tenant-scoped table, which means it should be generated rather than hand-written.</p>
+<div class="code-label">Row-level security</div>
+<pre><code><span class="cm">-- The application connects as this role. It is NOT the table owner,</span>
+<span class="cm">-- and it does NOT have BYPASSRLS. Both matter: owners bypass policies.</span>
+<span class="kw">CREATE ROLE</span> cinechain_app <span class="kw">LOGIN</span>;
+<span class="kw">GRANT SELECT</span>, <span class="kw">INSERT</span>, <span class="kw">UPDATE</span>, <span class="kw">DELETE ON ALL TABLES IN SCHEMA</span> public <span class="kw">TO</span> cinechain_app;
+
+<span class="kw">DO</span> $$
+<span class="kw">DECLARE</span> t text;
+<span class="kw">BEGIN</span>
+  <span class="kw">FOREACH</span> t <span class="kw">IN ARRAY ARRAY</span>[
+    <span class="st">'theatre'</span>,<span class="st">'screen'</span>,<span class="st">'seat'</span>,<span class="st">'film'</span>,<span class="st">'screening'</span>,
+    <span class="st">'seat_lock'</span>,<span class="st">'booking'</span>,<span class="st">'ticket'</span>,<span class="st">'payment'</span>,<span class="st">'pricing_rule'</span>,
+    <span class="st">'staff_user'</span>,<span class="st">'tenant_customer'</span>   <span class="cm">-- NOT platform.consumer: see 6.2</span>
+  ] <span class="kw">LOOP</span>
+    <span class="kw">EXECUTE</span> format(<span class="st">'ALTER TABLE %I ENABLE ROW LEVEL SECURITY'</span>, t);
+    <span class="cm">-- FORCE applies the policy to the table owner too</span>
+    <span class="kw">EXECUTE</span> format(<span class="st">'ALTER TABLE %I FORCE ROW LEVEL SECURITY'</span>, t);
+    <span class="kw">EXECUTE</span> format($f$
+      <span class="kw">CREATE POLICY</span> tenant_isolation <span class="kw">ON</span> %I
+        <span class="kw">USING</span>      (tenant_id = current_setting(<span class="st">'app.tenant_id'</span>, true)::uuid)
+        <span class="kw">WITH CHECK</span> (tenant_id = current_setting(<span class="st">'app.tenant_id'</span>, true)::uuid)
+    $f$, t);
+  <span class="kw">END LOOP</span>;
+<span class="kw">END</span> $$;</code></pre>
+
+<div class="box warn"><span class="bt">Three details that decide whether this actually works</span>
+<p><b><code>WITH CHECK</code> as well as <code>USING</code>.</b> <code>USING</code> governs what you can read; <code>WITH CHECK</code> governs what you can write. Without it, a tenant could insert a row stamped with another tenant's id — invisible to them afterwards, but present, and a route to corrupting another tenant's data.</p>
+<p><b><code>FORCE ROW LEVEL SECURITY</code>.</b> Without <code>FORCE</code>, the table owner bypasses the policy silently. Many teams enable RLS, run their tests as the owner, see everything pass, and ship a policy that has never been exercised.</p>
+<p><b><code>current_setting('app.tenant_id', true)</code></b><span class="cite g2">PostgreSQL — SET / SET LOCAL</span><b>.</b> The second argument makes a missing setting return NULL rather than raising. Since <code>NULL = anything</code> is never true, an unset tenant yields <em>zero rows</em> rather than an error — the system fails closed. Set it with <code>SET LOCAL</code> inside the transaction, never plain <code>SET</code>, or a pooled connection will carry one tenant's value into the next tenant's request.</p></div>
+
+<h3>6.6 Indexing</h3>
+<p>In a pooled schema, an index<span class="cite g2">Citus — Multi-tenant applications</span> that does not lead with <code>tenant_id</code> forces the database to scan across tenants and discard rows. This is correct, invisible in development with three tenants, and progressively ruinous.</p>
+<div class="code-label">Indexes</div>
+<pre><code><span class="cm">-- tenant_id leads every composite index on a tenant-scoped table</span>
+<span class="kw">CREATE INDEX</span> ON screening (tenant_id, screen_id, starts_at);
+<span class="kw">CREATE INDEX</span> ON screening (tenant_id, film_id, starts_at)
+  <span class="kw">WHERE</span> status = <span class="st">'published'</span>;      <span class="cm">-- partial: browsing only wants published</span>
+<span class="kw">CREATE INDEX</span> ON booking   (tenant_id, guest_email, created_at <span class="kw">DESC</span>);
+<span class="cm">-- a consumer's cross-chain history: scoped by person, NOT by tenant,</span>
+<span class="cm">-- so this one deliberately does not lead with tenant_id (FR-76)</span>
+<span class="kw">CREATE INDEX</span> ON booking   (consumer_id, created_at <span class="kw">DESC</span>) <span class="kw">WHERE</span> consumer_id <span class="kw">IS NOT NULL</span>;
+<span class="kw">CREATE INDEX</span> ON seat      (tenant_id, screen_id) <span class="kw">WHERE</span> is_active;
+
+<span class="cm">-- the hot path: "give me the whole seat map for this screening"</span>
+<span class="kw">CREATE INDEX</span> ON seat_lock (screening_id) <span class="kw">INCLUDE</span> (seat_id, status, expires_at);
+
+<span class="cm">-- the sweeper's query; partial index keeps it tiny</span>
+<span class="kw">CREATE INDEX</span> ON seat_lock (expires_at) <span class="kw">WHERE</span> status = <span class="st">'held'</span>;</code></pre>
+
+<table>
+<caption>Table growth and partitioning outlook</caption>
+<thead><tr><th style="width:18%">Table</th><th style="width:26%">Rows at 50 tenants, year 1</th><th>Strategy</th></tr></thead>
+<tbody>
+<tr><td><code>seat_lock</code></td><td>~40 M</td><td>The largest table by far. Partition by month on <code>created_at</code>; detach and archive partitions once their screenings have completed.</td></tr>
+<tr><td><code>ticket</code></td><td>~12 M</td><td>Partition by month once past ~50 M rows.</td></tr>
+<tr><td><code>booking</code></td><td>~4 M</td><td>No partitioning needed in year 1.</td></tr>
+<tr><td><code>screening</code></td><td>~500 K</td><td>Small. Keep hot via the partial index on published rows.</td></tr>
+<tr><td><code>seat</code></td><td>~200 K</td><td>Effectively static; an excellent cache candidate.</td></tr>
+</tbody></table>
+
+<h3>6.7 Decision record — how tenant data is partitioned</h3>
+<p class="lede">This is the decision with the longest shadow in the project. It is recorded here in full, with the options that were rejected and the evidence for each, so that it can be reviewed rather than inherited.</p>
+
+<figure class="fig-wide">{{d:partition-anatomy}}<figcaption><b>Figure 6.2.</b> The three options, applied to the same query. Note where the tenant is selected in each: in a predicate, in the session, or in the connection itself.</figcaption></figure>
+
+<div class="adr">
+<div class="adr-h"><b>ADR-001 — Tenant data partitioning</b><span>Accepted · supersedes nothing</span></div>
+<div class="adr-b">
+<h5>Context</h5>
+<p>CineChain must serve a long tail of small cinemas at a price point they will accept, while also being able to sign a national chain whose contract may demand dedicated infrastructure. These two requirements pull in opposite directions, and the partitioning model is where that tension is resolved. The decision must be made before the first migration, because it cannot be changed cheaply afterwards.</p>
+
+<h5>Options considered</h5>
+<p><b>Option A — shared tables with a <code>tenant_id</code> discriminator.</b> All tenants' rows in one set of tables, separated by a column and enforced by row-level security. This is what Golding calls pooled relational partitioning: take the existing design and introduce a tenant identifier that becomes the leading index, with the former primary key demoted to secondary.<span class="cite">G ch. 8, &ldquo;Pooled Relational Data Partitioning&rdquo;, p. 200</span></p>
+<p><b>Option B — one database, a schema per tenant.</b> Identical tables repeated inside <code>nyati</code>, <code>prestige</code>, <code>sarit</code> schemas; the tenant chosen by setting <code>search_path</code> per request.</p>
+<p><b>Option C — a database per tenant.</b> Physically separate databases, chosen when the connection is opened. Golding notes relational silos come in three grades — instance, database, or table per tenant — and that engine limits should inform which.<span class="cite">G ch. 8, &ldquo;Siloed Relational Data Partitioning&rdquo;, pp. 201&ndash;202</span></p>
+
+<h5>Evaluation against our actual requirements</h5>
+<table>
+<thead><tr><th style="width:30%">Requirement</th><th style="width:15%">A</th><th style="width:15%">B</th><th style="width:15%">C</th><th>Note</th></tr></thead>
+<tbody>
+<tr><td>200 tenants by year 2, mostly small (§9.2)</td><td class="c"><span class="yes">✓</span></td><td class="c"><span class="mid">~</span></td><td class="c"><span class="no">✗</span></td><td>C's fixed per-tenant cost cannot serve Basic tier profitably</td></tr>
+<tr><td>Onboard in under 60 s (FR-2)</td><td class="c"><span class="yes">✓</span></td><td class="c"><span class="mid">~</span></td><td class="c"><span class="no">✗</span></td><td>A is an <code>INSERT</code>; C provisions infrastructure</td></tr>
+<tr><td>Ship features weekly</td><td class="c"><span class="yes">✓</span></td><td class="c"><span class="no">✗</span></td><td class="c"><span class="no">✗</span></td><td>B and C both migrate once per tenant</td></tr>
+<tr><td>Dedicated tier with own backups/keys</td><td class="c"><span class="no">✗</span></td><td class="c"><span class="no">✗</span></td><td class="c"><span class="yes">✓</span></td><td>Only C gives a per-tenant encryption key</td></tr>
+<tr><td>Contain a very large tenant's data volume</td><td class="c"><span class="mid">~</span></td><td class="c"><span class="mid">~</span></td><td class="c"><span class="yes">✓</span></td><td>A can partition natively first; C is the end state</td></tr>
+<tr><td>Verifiable deletion on offboarding (FR-8)</td><td class="c"><span class="mid">~</span></td><td class="c"><span class="yes">✓</span></td><td class="c"><span class="yes">✓</span></td><td>A needs a written, tested deletion job</td></tr>
+<tr><td>Cross-tenant platform metering (FR-67)</td><td class="c"><span class="yes">✓</span></td><td class="c"><span class="mid">~</span></td><td class="c"><span class="no">✗</span></td><td>C requires fan-out or a warehouse</td></tr>
+</tbody></table>
+
+<h5>Decision</h5>
+<p><b>Adopt Option A as the default for every table, with row-level security as the enforcing mechanism. Provide Option C for individual tenants on the Premium and Dedicated tiers, selected by configuration. Reject Option B entirely.</b></p>
+<p>Option B is rejected because its costs scale with tenant count in the same way C's do — migrations run once per schema — while its blast radius remains shared like A's. It would buy most of C's operational burden for only part of C's isolation benefit. It remains available if a future requirement specifically needs per-tenant dump and restore without physical separation, but nothing in the current requirements asks for that.</p>
+<p>The default follows the book's guidance directly:</p>
+<blockquote>
+<p>&ldquo;My recommendation is to default to a pooled model for all the storage in your system… you're essentially forcing any siloed data to earn its way out based on a set of clear requirements that justify taking on the trade-offs.&rdquo;</p>
+<p class="src">— Golding, ch. 8, &ldquo;Defaulting to a Pooled Model&rdquo;, p. 195</p>
+</blockquote>
+
+<h5>What qualifies a tenant to move to Option C</h5>
+<p>A tenant moves to a dedicated database when, and only when, one of these is true. Revenue and customer prominence are not on this list — those are reasons to <em>price</em> a silo, not to need one.</p>
+<ul class="clean">
+<li>A contract or regulator requires physical separation or data residency in a named jurisdiction.</li>
+<li>The tenant must supply and control their own encryption key.</li>
+<li>Their data volume measurably degrades shared index performance for other tenants.</li>
+<li>They require a recovery or retention guarantee that shared storage cannot meet.</li>
+</ul>
+
+<h5>Consequences — accepted</h5>
+<ul class="clean">
+<li><b>Row-level security becomes load-bearing.</b> In Option A a forgotten predicate is a data breach rather than a bug. RLS is therefore not defence in depth here — it is the primary control, and §13.1 tests it as such.</li>
+<li><b>Every index must lead with <code>tenant_id</code>.</b> Enforced in the definition of done (§15.2).</li>
+<li><b>Uniqueness is composite.</b> <code>(tenant_id, reference)</code>, never <code>reference</code> alone.</li>
+<li><b>A tenant-deletion job must be written and tested early</b>, because Option A cannot satisfy FR-8 by dropping anything.</li>
+<li><b>Siloed tenants keep the <code>tenant_id</code> column</b> even though it is constant for them — so that the schema, the queries and the policies are byte-identical in both models.</li>
+<li><b>Connection state must be transaction-scoped.</b> <code>SET LOCAL</code>, never <code>SET</code>, or pooling leaks one tenant's context into the next request.</li>
+</ul>
+
+<h5>How we keep the escape hatch cheap</h5>
+<p>The decision is only safe if moving a tenant from A to C stays a configuration change. Three properties guarantee it, and all three are testable:</p>
+<ol class="tight">
+<li>The schema is identical in both models — same migrations, same policies, same <code>tenant_id</code> column.</li>
+<li>Placement is a data lookup: <code>tenant.db_ref</code>, null meaning the shared pool, read by the connection resolver at the edge of each request.</li>
+<li>No business logic branches on tier or placement. Enforced in review (§10.2).</li>
+</ol>
+<p>The migration procedure itself is specified in §10.3.</p>
+
+<h5>Revisit this decision when</h5>
+<ul class="tight">
+<li>Any single tenant exceeds roughly 15% of total row volume in <code>seat_lock</code> or <code>ticket</code>.</li>
+<li>More than a quarter of tenants qualify for Option C — at which point the pooled default is no longer serving the majority.</li>
+<li>Native table partitioning by <code>tenant_id</code> stops containing the largest tenants (see the growth table in §6.5).</li>
+<li>A market is entered whose data-residency rules apply to all customers rather than a few.</li>
+</ul>
+</div>
+</div>
+
+<figure>{{d:partition-migration}}<figcaption><b>Figure 6.3.</b> The migration paths this decision commits us to. A → C must stay cheap; C → A we expect never to perform.</figcaption></figure>

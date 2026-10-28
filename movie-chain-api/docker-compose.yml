@@ -1,0 +1,72 @@
+# Local infrastructure for the CineChain API — smallest images that do the job.
+# Host ports avoid the native services on this machine:
+#   Postgres 5432 (v17) and 5433 (v18) are taken -> 5434
+#   Redis 6379 is taken                         -> 6380
+name: cinechain
+
+x-minio-env: &minio-env
+  MINIO_ROOT_USER: cinechain
+  MINIO_ROOT_PASSWORD: cinechain-minio-secret
+  # Lets the bundled `mc` reach this server without an `alias set`.
+  MC_HOST_local: http://cinechain:cinechain-minio-secret@localhost:9000
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: cinechain_admin
+      POSTGRES_PASSWORD: cinechain_admin
+      POSTGRES_DB: cinechain
+    ports: ["127.0.0.1:5434:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cinechain_admin -d cinechain"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports: ["127.0.0.1:6380:6379"]
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # S3-compatible object storage: posters (step 10), exports (steps 22, 27).
+  # The official minio/* images are no longer publicly pullable; Chainguard's
+  # Wolfi-based image is minimal and ships `mc`, so no separate client image.
+  minio:
+    image: cgr.dev/chainguard/minio:latest
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment: *minio-env
+    ports: ["127.0.0.1:9000:9000", "127.0.0.1:9001:9001"]
+    volumes: [miniodata:/data]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # One-shot: create the private bucket, then exit.
+  minio-init:
+    image: cgr.dev/chainguard/minio:latest
+    depends_on:
+      minio: { condition: service_healthy }
+    environment:
+      MC_HOST_local: http://cinechain:cinechain-minio-secret@minio:9000
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        mc mb --ignore-existing local/cinechain-media &&
+        mc anonymous set none local/cinechain-media &&
+        echo 'bucket cinechain-media ready (private)'
+    restart: "no"
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:

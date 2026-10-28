@@ -1,0 +1,40 @@
+<svg viewBox="0 0 720 298" role="img">
+<text class="s-cap" x="0" y="11">The Go / Gin request pipeline — same boundary, different machinery</text>
+<rect class="b" x="0" y="22" width="86" height="40"/><text class="s-lb mid-a" x="43" y="40">Request</text><text class="s-xs mid-a" x="43" y="54">HTTP in</text>
+<path class="ln" d="M86 42 L104 42" marker-end="url(#ah)"/>
+<rect class="b-am" x="104" y="22" width="116" height="40"/><text class="s-lb mid-a" x="162" y="38">gin.Recovery</text><text class="s-xs mid-a" x="162" y="51">+ RequestID, Logger</text>
+<path class="ln" d="M220 42 L238 42" marker-end="url(#ah)"/>
+<rect class="b-am" x="238" y="22" width="116" height="40"/><text class="s-lb mid-a" x="296" y="38">AuthMiddleware</text><text class="s-xs mid-a" x="296" y="51">verify JWT</text>
+<path class="ln" d="M354 42 L372 42" marker-end="url(#ah)"/>
+<rect class="b-am" x="372" y="22" width="132" height="40"/><text class="s-lb mid-a" x="438" y="38">TenantMiddleware</text><text class="s-xs mid-a" x="438" y="51">context.WithValue</text>
+<path class="ln" d="M504 42 L522 42" marker-end="url(#ah)"/>
+<rect class="b" x="522" y="22" width="86" height="40"/><text class="s-lb mid-a" x="565" y="38">Binding</text><text class="s-xs mid-a" x="565" y="51">ShouldBindJSON</text>
+<path class="ln" d="M608 42 L626 42" marker-end="url(#ah)"/>
+<rect class="b-bl" x="626" y="22" width="94" height="40"/><text class="s-lb mid-a" x="673" y="38">Handler</text><text class="s-xs mid-a" x="673" y="51">your code</text>
+
+<path class="ln-a" d="M438 62 L438 84" marker-end="url(#ah-a)"/>
+<rect class="b-am" x="150" y="84" width="570" height="74" rx="5"/>
+<text class="s-hd" x="162" y="102">TenantMiddleware — and Go's advantage here</text>
+<text class="s-sm" x="162" y="120">Go's <tspan class="s-mono">context.Context</tspan> is already threaded through every idiomatic signature — including <tspan class="s-mono">db.QueryContext</tspan>. You are</text>
+<text class="s-sm" x="162" y="135">not bolting ambient state onto the language; you are using the mechanism it already has. Put the tenant in the</text>
+<text class="s-sm" x="162" y="150">context, then let only the <tspan class="s-mono">Store</tspan> layer read it out — handlers never touch tenant IDs directly.</text>
+<rect class="b-rd" x="0" y="84" width="140" height="74" rx="5"/>
+<text class="s-lb" x="8" y="102">No claim?</text>
+<text class="s-xs" x="8" y="118">c.AbortWithStatus(401)</text>
+<text class="s-xs" x="8" y="133">Return immediately.</text>
+<text class="s-xs" x="8" y="148">Fail closed.</text>
+
+<rect class="b-n" x="0" y="172" width="720" height="58" rx="5"/>
+<text class="s-hdw" x="12" y="190">The discipline Go demands in exchange</text>
+<text class="s-smw" x="12" y="208">Nothing stops a developer writing <tspan class="s-monow">db.Query("SELECT * FROM booking")</tspan> with no tenant scope. Go has no framework to save you, so you</text>
+<text class="s-smw" x="12" y="223">build the guard rails: a repository layer that takes <tspan class="s-monow">ctx</tspan> and derives the tenant itself, plus RLS underneath. Convention plus the database.</text>
+
+<rect class="b-am" x="0" y="242" width="350" height="52" rx="5"/>
+<text class="s-lb" x="10" y="259">Supporting cast</text>
+<text class="s-xs" x="10" y="274">pgx · sqlc · golang-migrate · go-redis · asynq (jobs)</text>
+<text class="s-xs" x="10" y="287">zerolog · OpenTelemetry · testcontainers-go</text>
+<rect class="b-gr" x="370" y="242" width="350" height="52" rx="5"/>
+<text class="s-lb" x="380" y="259">What you gain</text>
+<text class="s-xs" x="380" y="274">Far lower memory per connection and predictable latency</text>
+<text class="s-xs" x="380" y="287">under seat-release stampedes — this system's exact workload.</text>
+</svg>
