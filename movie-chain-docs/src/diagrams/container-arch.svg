@@ -1,0 +1,48 @@
+<svg viewBox="0 0 720 440" role="img">
+<text class="s-cap" x="0" y="11">Clients</text>
+<rect class="b" x="0" y="18" width="164" height="38"/><text class="s-lb mid-a" x="82" y="34">Customer web / PWA</text><text class="s-xs mid-a" x="82" y="48">browse · book · pay</text>
+<rect class="b" x="176" y="18" width="164" height="38"/><text class="s-lb mid-a" x="258" y="34">Box-office &amp; usher app</text><text class="s-xs mid-a" x="258" y="48">walk-ins · scan tickets</text>
+<rect class="b" x="352" y="18" width="164" height="38"/><text class="s-lb mid-a" x="434" y="34">Tenant admin console</text><text class="s-xs mid-a" x="434" y="48">theatres · films · pricing</text>
+<rect class="b-am" x="528" y="18" width="192" height="38"/><text class="s-lb mid-a" x="624" y="34">Provider admin console</text><text class="s-xs mid-a" x="624" y="48">control plane · all tenants</text>
+
+<path class="ln" d="M258 56 L258 74" marker-end="url(#ah)"/><path class="ln-a" d="M624 56 L624 74" marker-end="url(#ah-a)"/>
+<rect class="b-n" x="0" y="74" width="516" height="34" rx="5"/>
+<text class="s-lbw" x="12" y="89">API gateway / ingress</text>
+<text class="s-smw" x="12" y="102">TLS · JWT verification · per-tenant rate limiting · request-id</text>
+<rect class="b-n" x="528" y="74" width="192" height="34" rx="5"/>
+<text class="s-lbw" x="540" y="89">Identity provider</text>
+<text class="s-smw" x="540" y="102">issues tenant_id claim</text>
+<path class="ln-a" d="M528 91 L520 91" marker-end="url(#ah-a)"/>
+
+<rect class="b-bl" x="0" y="122" width="516" height="126" rx="5"/>
+<text class="s-capb" x="10" y="139">APPLICATION PLANE — tenant-scoped, every request carries context</text>
+<rect class="b" x="10" y="146" width="120" height="44"/><text class="s-lb mid-a" x="70" y="163">Catalogue svc</text><text class="s-xs mid-a" x="70" y="176">films, screenings</text><text class="s-xs mid-a" x="70" y="186">read-heavy, cached</text>
+<rect class="b" x="138" y="146" width="120" height="44"/><text class="s-lb mid-a" x="198" y="163">Inventory svc</text><text class="s-xs mid-a" x="198" y="176">seat maps, holds</text><text class="s-xs mid-a" x="198" y="186">latency critical</text>
+<rect class="b" x="266" y="146" width="120" height="44"/><text class="s-lb mid-a" x="326" y="163">Booking svc</text><text class="s-xs mid-a" x="326" y="176">orders, tickets</text><text class="s-xs mid-a" x="326" y="186">transactional</text>
+<rect class="b" x="394" y="146" width="112" height="44"/><text class="s-lb mid-a" x="450" y="163">Payment svc</text><text class="s-xs mid-a" x="450" y="176">charge, refund</text><text class="s-xs mid-a" x="450" y="186">webhook sink</text>
+<rect class="b" x="10" y="196" width="160" height="42"/><text class="s-lb mid-a" x="90" y="213">Notification svc</text><text class="s-xs mid-a" x="90" y="227">SMS · e-mail · push</text>
+<rect class="b" x="178" y="196" width="160" height="42"/><text class="s-lb mid-a" x="258" y="213">Reporting svc</text><text class="s-xs mid-a" x="258" y="227">occupancy · revenue</text>
+<rect class="b" x="346" y="196" width="160" height="42"/><text class="s-lb mid-a" x="426" y="213">Scheduler / workers</text><text class="s-xs mid-a" x="426" y="227">hold sweeper · reminders</text>
+
+<rect class="b-am" x="528" y="122" width="192" height="126" rx="5"/>
+<text class="s-cap" x="538" y="139">CONTROL PLANE</text>
+<rect class="b" x="538" y="146" width="172" height="22"/><text class="s-xs mid-a" x="624" y="160">Tenant management</text>
+<rect class="b" x="538" y="172" width="172" height="22"/><text class="s-xs mid-a" x="624" y="186">Onboarding orchestrator</text>
+<rect class="b" x="538" y="198" width="172" height="22"/><text class="s-xs mid-a" x="624" y="212">Metering &amp; billing</text>
+<rect class="b" x="538" y="224" width="172" height="20"/><text class="s-xs mid-a" x="624" y="237">Tenant config registry</text>
+
+<path class="ln-a" d="M528 185 L512 185" marker-end="url(#ah-a)"/>
+<text class="s-xs" x="452" y="258">tier &amp; limits pushed down · usage pushed up</text>
+
+<rect class="b-w" x="0" y="264" width="720" height="104" rx="5"/>
+<text class="s-capm" x="10" y="281">DATA</text>
+<rect class="b-bl" x="10" y="288" width="168" height="70"/><text class="s-lb mid-a" x="94" y="305">PostgreSQL — pooled</text><text class="s-xs mid-a" x="94" y="319">all tenant tables + RLS</text><text class="s-xs mid-a" x="94" y="332">Basic &amp; Standard tiers</text><text class="s-xs mid-a" x="94" y="348">the default home for data</text>
+<rect class="b-am" x="186" y="288" width="168" height="70"/><text class="s-lb mid-a" x="270" y="305">PostgreSQL — siloed</text><text class="s-xs mid-a" x="270" y="319">one database per tenant</text><text class="s-xs mid-a" x="270" y="332">Premium &amp; Dedicated</text><text class="s-xs mid-a" x="270" y="348">same schema, same code</text>
+<rect class="b-gr" x="362" y="288" width="168" height="70"/><text class="s-lb mid-a" x="446" y="305">Redis</text><text class="s-xs mid-a" x="446" y="319">seat locks (TTL)</text><text class="s-xs mid-a" x="446" y="332">seat-map cache · rate limits</text><text class="s-xs mid-a" x="446" y="348">keys prefixed t:{tenant}:</text>
+<rect class="b-pu" x="538" y="288" width="172" height="70"/><text class="s-lb mid-a" x="624" y="305">Object storage</text><text class="s-xs mid-a" x="624" y="319">posters · QR codes</text><text class="s-xs mid-a" x="624" y="332">invoices · exports</text><text class="s-xs mid-a" x="624" y="348">prefixed by tenant</text>
+
+<rect class="b-n" x="0" y="378" width="720" height="58" rx="5"/>
+<text class="s-hdw" x="12" y="396">The shape to notice</text>
+<text class="s-smw" x="12" y="414">Pooled and siloed databases sit side by side, served by <b>the same services</b>. A tenant's tier decides which connection the request gets —</text>
+<text class="s-smw" x="12" y="429">it never decides which code runs. Getting that boundary right is what lets you sell four tiers without maintaining four products.</text>
+</svg>

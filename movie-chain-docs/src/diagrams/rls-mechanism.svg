@@ -1,0 +1,37 @@
+<svg viewBox="0 0 720 284" role="img">
+<text class="s-cap" x="0" y="11">Row-level security — the database refuses to show rows that aren't yours</text>
+<rect class="b-rd" x="0" y="22" width="348" height="112" rx="5"/>
+<text class="s-hd" x="12" y="40">Without RLS — safety depends on the developer</text>
+<rect class="b" x="12" y="48" width="324" height="34"/>
+<text class="s-mono" x="20" y="62">SELECT * FROM booking WHERE id = 4471;</text>
+<text class="s-xs" x="20" y="75">Developer forgot AND tenant_id = … — it happens</text>
+<path class="ln-r" d="M174 82 L174 96" marker-end="url(#ah-r)"/>
+<rect class="b-rd" x="12" y="98" width="324" height="28"/>
+<text class="s-lb mid-a" x="174" y="116">Returns another tenant's booking. Breach.</text>
+
+<rect class="b-gr" x="372" y="22" width="348" height="112" rx="5"/>
+<text class="s-hd" x="384" y="40">With RLS — safety is a property of the data</text>
+<rect class="b" x="384" y="48" width="324" height="34"/>
+<text class="s-mono" x="392" y="62">SELECT * FROM booking WHERE id = 4471;</text>
+<text class="s-xs" x="392" y="75">Exactly the same buggy query</text>
+<path class="ln-g" d="M546 82 L546 96" marker-end="url(#ah-g)"/>
+<rect class="b-gr" x="384" y="98" width="324" height="28"/>
+<text class="s-lb mid-a" x="546" y="116">Returns 0 rows. The policy rewrote it.</text>
+
+<rect class="b-n" x="0" y="146" width="720" height="60" rx="5"/>
+<text class="s-hdw" x="14" y="165">What you write once, at setup</text>
+<text class="s-monow" x="14" y="182">ALTER TABLE booking ENABLE ROW LEVEL SECURITY;</text>
+<text class="s-monow" x="14" y="197">CREATE POLICY t_isolation ON booking USING (tenant_id = current_setting('app.tenant_id')::uuid);</text>
+
+<rect class="b-am" x="0" y="216" width="348" height="64" rx="5"/>
+<text class="s-hd" x="12" y="234">What happens per request</text>
+<text class="s-mono" x="12" y="251">SET LOCAL app.tenant_id = 'nyati-uuid';</text>
+<text class="s-xs" x="12" y="266">Set by the interceptor, inside the transaction,</text>
+<text class="s-xs" x="12" y="277">from the verified token — never from user input.</text>
+
+<rect class="b-w" x="372" y="216" width="348" height="64" rx="5"/>
+<text class="s-hd" x="384" y="234">The two traps</text>
+<text class="s-sm" x="384" y="250">1.  Table owners and SUPERUSER bypass RLS by default —</text>
+<text class="s-sm" x="384" y="262">     your app must connect as a non-owner role.</text>
+<text class="s-sm" x="384" y="276">2.  Use SET LOCAL, or a pooled connection leaks the value.</text>
+</svg>

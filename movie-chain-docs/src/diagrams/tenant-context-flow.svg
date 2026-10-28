@@ -1,0 +1,37 @@
+<svg viewBox="0 0 720 300" role="img">
+<rect class="b" x="0" y="26" width="96" height="44"/><text class="s-hd mid-a" x="48" y="45">Customer</text><text class="s-xs mid-a" x="48" y="59">books a seat</text>
+<path class="ln" d="M96 48 L136 48" marker-end="url(#ah)"/>
+<rect class="b-am" x="136" y="26" width="112" height="44"/><text class="s-hd mid-a" x="192" y="45">Identity</text><text class="s-xs mid-a" x="192" y="59">signs a JWT</text>
+<path class="ln" d="M248 48 L288 48" marker-end="url(#ah)"/>
+<rect class="b-n" x="288" y="20" width="200" height="56" rx="5"/>
+<text class="s-lbw mid-a" x="388" y="38">JWT — signed, tamper-proof</text>
+<text class="s-monow mid-a" x="388" y="54">"sub":"u_88", "tenant_id":"nyati"</text>
+<text class="s-monow mid-a" x="388" y="68">"tier":"premium", "role":"customer"</text>
+<path class="ln" d="M488 48 L528 48" marker-end="url(#ah)"/>
+<rect class="b" x="528" y="26" width="192" height="44"/><text class="s-hd mid-a" x="624" y="45">API gateway</text><text class="s-xs mid-a" x="624" y="59">verifies signature</text>
+
+<path class="ln-a" d="M624 70 L624 96" marker-end="url(#ah-a)"/>
+<rect class="b-am" x="200" y="96" width="520" height="40" rx="5"/>
+<text class="s-hd" x="212" y="114">Interceptor / middleware — runs before EVERY handler</text>
+<text class="s-xs" x="212" y="129">Reads tenant_id from the token, puts it in request-scoped context. One place. Not copy-pasted.</text>
+<rect class="b-rd" x="0" y="96" width="188" height="40" rx="5"/>
+<text class="s-xs" x="10" y="112">No tenant_id in token?</text>
+<text class="s-xs" x="10" y="126">→ reject 401. Never default.</text>
+
+<path class="ln-a" d="M300 136 L300 160" marker-end="url(#ah-a)"/>
+<path class="ln-a" d="M460 136 L460 160" marker-end="url(#ah-a)"/>
+<path class="ln-a" d="M620 136 L620 160" marker-end="url(#ah-a)"/>
+<rect class="b-bl" x="220" y="160" width="160" height="40" rx="4"/><text class="s-lb mid-a" x="300" y="177">Business logic</text><text class="s-xs mid-a" x="300" y="191">never re-reads the token</text>
+<rect class="b-bl" x="390" y="160" width="140" height="40" rx="4"/><text class="s-lb mid-a" x="460" y="177">Logs &amp; metrics</text><text class="s-xs mid-a" x="460" y="191">stamped with tenant</text>
+<rect class="b-bl" x="540" y="160" width="180" height="40" rx="4"/><text class="s-lb mid-a" x="630" y="177">Data access</text><text class="s-xs mid-a" x="630" y="191">scoped automatically</text>
+
+<path class="ln-a" d="M630 200 L630 226" marker-end="url(#ah-a)"/>
+<rect class="b-n" x="380" y="226" width="340" height="52" rx="5"/>
+<text class="s-lbw" x="392" y="245">Database enforces it a second time</text>
+<text class="s-monow" x="392" y="261">SET app.tenant_id = 'nyati';  -- row-level security</text>
+<text class="s-smw" x="392" y="273">Even a buggy query cannot cross the line.</text>
+<rect class="b-gr" x="0" y="226" width="360" height="52" rx="5"/>
+<text class="s-lb" x="12" y="245">Why two layers?</text>
+<text class="s-sm" x="12" y="261">Because application code is written by humans who forget</text>
+<text class="s-sm" x="12" y="274">a WHERE clause. Defence in depth, not paranoia.</text>
+</svg>

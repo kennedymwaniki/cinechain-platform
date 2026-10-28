@@ -1,0 +1,26 @@
+<svg viewBox="0 0 720 250" role="img">
+<text class="s-cap" x="0" y="11">The life of one seat, at one screening</text>
+<rect class="b-gr" x="0" y="46" width="118" height="44" rx="5"/><text class="s-hd mid-a" x="59" y="64">AVAILABLE</text><text class="s-xs mid-a" x="59" y="79">no row / no key</text>
+<path class="ln-a" d="M118 68 L186 68" marker-end="url(#ah-a)"/><text class="s-xs mid-a" x="152" y="62">select</text><text class="s-xs mid-a" x="152" y="84">SET NX</text>
+<rect class="b-am" x="186" y="46" width="118" height="44" rx="5"/><text class="s-hd mid-a" x="245" y="64">HELD</text><text class="s-xs mid-a" x="245" y="79">TTL 300s ticking</text>
+<path class="ln-g" d="M304 68 L372 68" marker-end="url(#ah-g)"/><text class="s-xs mid-a" x="338" y="62">payment ok</text>
+<rect class="b-bl" x="372" y="46" width="118" height="44" rx="5"/><text class="s-hd mid-a" x="431" y="64">SOLD</text><text class="s-xs mid-a" x="431" y="79">durable in Postgres</text>
+<path class="ln" d="M490 68 L558 68" marker-end="url(#ah)"/><text class="s-xs mid-a" x="524" y="62">scanned</text>
+<rect class="b-w" x="558" y="46" width="118" height="44" rx="5"/><text class="s-hd mid-a" x="617" y="64">REDEEMED</text><text class="s-xs mid-a" x="617" y="79">customer is seated</text>
+
+<path class="ln-r" d="M245 90 L245 120 L59 120 L59 90" marker-end="url(#ah-r)"/>
+<text class="s-xs mid-a" x="152" y="134">TTL expired, or customer cancelled → seat returns to sale automatically</text>
+<path class="ln-r" d="M431 90 L431 150 L59 150 L59 92" marker-end="url(#ah-r)"/>
+<text class="s-xs mid-a" x="245" y="164">refund / screening cancelled → released and re-sellable</text>
+
+<rect class="b-rd" x="0" y="176" width="350" height="70" rx="5"/>
+<text class="s-hd" x="12" y="194">Illegal transitions — enforce, don't trust</text>
+<text class="s-sm" x="12" y="211">AVAILABLE → SOLD  (never skip the hold)</text>
+<text class="s-sm" x="12" y="226">HELD(Grace) → SOLD(Brian)  (hold ownership is checked)</text>
+<text class="s-sm" x="12" y="241">REDEEMED → anything  (a used ticket is final)</text>
+<rect class="b-w" x="370" y="176" width="350" height="70" rx="5"/>
+<text class="s-hd" x="382" y="194">The states customers actually see</text>
+<text class="s-sm" x="382" y="211">Your seat map shows only three colours: free, taken, mine.</text>
+<text class="s-sm" x="382" y="226">HELD-by-someone-else and SOLD both render as &quot;taken&quot; —</text>
+<text class="s-sm" x="382" y="241">never reveal that a seat is merely being considered.</text>
+</svg>

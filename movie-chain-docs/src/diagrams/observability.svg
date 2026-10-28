@@ -1,0 +1,42 @@
+<svg viewBox="0 0 720 236" role="img">
+<text class="s-cap" x="0" y="11">Every signal your system emits must answer &quot;which tenant?&quot;</text>
+<rect class="b-rd" x="0" y="20" width="350" height="92" rx="5"/>
+<text class="s-hd" x="12" y="38">Single-tenant thinking</text>
+<rect x="12" y="46" width="326" height="56" rx="4" fill="#0e1726"/>
+<text class="s-monow" x="20" y="62">ERROR  seat hold failed</text>
+<text class="s-monow" x="20" y="76">p99_latency  2140ms</text>
+<text class="s-monow" x="20" y="90">bookings_total  18422</text>
+<text class="s-xs" x="12" y="110">True, useless. Who is hurting? You cannot tell.</text>
+
+<rect class="b-gr" x="370" y="20" width="350" height="92" rx="5"/>
+<text class="s-hd" x="382" y="38">Tenant-aware</text>
+<rect x="382" y="46" width="326" height="56" rx="4" fill="#0e1726"/>
+<text class="s-monow" x="390" y="62">ERROR  tenant=nyati screening=88 seat=B7</text>
+<text class="s-monow" x="390" y="76">p99_latency{tenant="prestige"} 2140ms</text>
+<text class="s-monow" x="390" y="90">bookings_total{tenant="sarit",tier="basic"} 41</text>
+<text class="s-xs" x="382" y="110">Now it is a diagnosis, not a symptom.</text>
+
+<rect class="b-w" x="0" y="124" width="234" height="104" rx="5"/>
+<text class="s-hd" x="10" y="142">Logs</text>
+<text class="s-sm" x="10" y="160">Inject tenant_id in the same</text>
+<text class="s-sm" x="10" y="174">interceptor that sets context —</text>
+<text class="s-sm" x="10" y="188">never ask developers to</text>
+<text class="s-sm" x="10" y="202">remember it.</text>
+<text class="s-xs" x="10" y="220">And never log seat-holder names or card data.</text>
+
+<rect class="b-w" x="243" y="124" width="234" height="104" rx="5"/>
+<text class="s-hd" x="253" y="142">Metrics</text>
+<text class="s-sm" x="253" y="160">Tenant as a label, not a</text>
+<text class="s-sm" x="253" y="174">separate metric. Watch</text>
+<text class="s-sm" x="253" y="188">cardinality: 50 000 tenants ×</text>
+<text class="s-sm" x="253" y="202">20 metrics will melt Prometheus.</text>
+<text class="s-xs" x="253" y="220">Label the top N; bucket the long tail.</text>
+
+<rect class="b-w" x="486" y="124" width="234" height="104" rx="5"/>
+<text class="s-hd" x="496" y="142">Traces</text>
+<text class="s-sm" x="496" y="160">tenant_id as a span attribute</text>
+<text class="s-sm" x="496" y="174">on the root span, propagated</text>
+<text class="s-sm" x="496" y="188">downstream. Lets you replay</text>
+<text class="s-sm" x="496" y="202">one chain's bad Friday night.</text>
+<text class="s-xs" x="496" y="220">Sample siloed tenants at 100% — they are few.</text>
+</svg>

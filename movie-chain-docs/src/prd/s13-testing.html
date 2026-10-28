@@ -1,0 +1,105 @@
+<h2><span class="num">13</span>Testing Strategy</h2>
+<p class="lede">Two categories of test in this system are not optional and cannot be approximated: isolation tests and concurrency tests. Everything else is ordinary.</p>
+
+<h3>13.1 The isolation suite</h3>
+<p>This suite exists to answer one question with evidence rather than confidence: <em>can tenant A reach tenant B's data by any route?</em> It runs against a real PostgreSQL via Testcontainers, because RLS cannot be exercised against a mock.</p>
+
+<div class="code-label">The test every endpoint must pass</div>
+<pre class="lite"><code>GIVEN  tenant A and tenant B both exist, each with a booking
+WHEN   a user of tenant A calls every endpoint in the catalogue,
+       substituting tenant B's resource identifiers
+THEN   every response is 404 — never 403, never 200, never a
+       timing difference large enough to distinguish the two
+
+AND    the attempt is recorded as a security event
+AND    no row belonging to B appears in any response body</code></pre>
+
+<p>This is generated rather than hand-written: the suite enumerates the route table, so a new endpoint is covered the day it is added. An endpoint that cannot be exercised this way must be explicitly annotated as public, and that annotation is reviewed.</p>
+
+<div class="code-label">Proving RLS itself works — run this in CI, not just once</div>
+<pre><code><span class="cm">-- 1 · The policy blocks reads</span>
+<span class="kw">SET LOCAL</span> app.tenant_id = <span class="st">'aaaa-...-a'</span>;
+<span class="kw">SELECT count</span>(*) <span class="kw">FROM</span> booking;          <span class="cm">-- expect: only A's rows</span>
+
+<span class="kw">SET LOCAL</span> app.tenant_id = <span class="st">'bbbb-...-b'</span>;
+<span class="kw">SELECT count</span>(*) <span class="kw">FROM</span> booking;          <span class="cm">-- expect: only B's rows</span>
+
+<span class="cm">-- 2 · Unset tenant returns NOTHING, not everything. Fail closed.</span>
+<span class="kw">RESET</span> app.tenant_id;
+<span class="kw">SELECT count</span>(*) <span class="kw">FROM</span> booking;          <span class="cm">-- expect: 0</span>
+
+<span class="cm">-- 3 · WITH CHECK blocks writing a foreign tenant_id</span>
+<span class="kw">SET LOCAL</span> app.tenant_id = <span class="st">'aaaa-...-a'</span>;
+<span class="kw">INSERT INTO</span> booking (tenant_id, ...) <span class="kw">VALUES</span> (<span class="st">'bbbb-...-b'</span>, ...);
+<span class="cm">-- expect: ERROR — new row violates row-level security policy</span>
+
+<span class="cm">-- 4 · The application role cannot bypass RLS</span>
+<span class="kw">SELECT</span> rolbypassrls <span class="kw">FROM</span> pg_roles <span class="kw">WHERE</span> rolname = <span class="st">'cinechain_app'</span>;
+<span class="cm">-- expect: false     ← this single assertion catches the classic mistake</span>
+
+<span class="cm">-- 5 · The platform consumer directory is unreachable from tenant code.</span>
+<span class="cm">--     platform.consumer has NO RLS policy (§6.2), so its protection is</span>
+<span class="cm">--     the grant, not a policy. Assert the grant, or the exception</span>
+<span class="cm">--     becomes a hole nobody notices.</span>
+<span class="kw">SET LOCAL</span> app.tenant_id = <span class="st">'aaaa-...-a'</span>;
+<span class="kw">SELECT</span> * <span class="kw">FROM</span> platform.consumer;
+<span class="cm">-- expect: ERROR — permission denied for table consumer</span></code></pre>
+
+<h4>Token-type tests</h4>
+<p>§4.2 splits users into three populations. Three assertions keep that split honest, and they belong in the generated suite alongside the cross-tenant probes.</p>
+<pre class="lite"><code>GIVEN  a staff token for tenant A
+WHEN   it is presented to a consumer endpoint (POST /screenings/:id/holds)
+THEN   403 wrong_token_type — a Nyati clerk must not transact as a
+       Prestige customer
+
+GIVEN  a consumer token (no tenant_id claim)
+WHEN   it is presented to a staff endpoint (POST /theatres)
+THEN   401 no_tenant_context — never defaulted to any tenant
+
+GIVEN  a hold_token minted for a screening belonging to tenant A
+WHEN   it is replayed against a booking for tenant B's screening
+THEN   401 hold_token_invalid — the tenant is inside the signature</code></pre>
+
+<div class="box key"><span class="bt">Test 4 is the one that matters most</span>
+<p>Every other test in this suite passes happily against a database where the application connects as the table owner — because the owner bypasses RLS and sees everything, including the rows the test expects. Asserting <code>rolbypassrls = false</code>, and that the application role is not the table owner, is what makes the rest of the suite meaningful. Without it, a green test run proves nothing.</p></div>
+
+<h3>13.2 Concurrency tests</h3>
+<p>These target the guarantees in §7.1. They must run against real Redis and real PostgreSQL; in-memory substitutes do not reproduce the interleavings that matter.</p>
+<table>
+<thead><tr><th style="width:26%">Test</th><th style="width:34%">Setup</th><th>Assertion</th></tr></thead>
+<tbody>
+<tr><td><b>Single-seat stampede</b></td><td>200 concurrent hold requests for one seat</td><td>Exactly 1 success, 199 &times; <code>409</code>. Not &ldquo;about one&rdquo;.</td></tr>
+<tr><td><b>Multi-seat atomicity</b></td><td>Two requests for overlapping seat sets, e.g. {A,B} and {B,C}</td><td>Exactly one succeeds; the loser holds <em>nothing</em> — no partial hold of A or C</td></tr>
+<tr><td><b>Expiry releases</b></td><td>Hold with a 2 s window, then wait</td><td>Seat re-holdable within 100 ms of expiry, without the sweeper having run</td></tr>
+<tr><td><b>Sweeper reconciles</b></td><td>Delete the Redis key directly, simulating eviction</td><td>Durable row marked expired within one sweep; seat sellable</td></tr>
+<tr><td><b>Redis outage</b></td><td>Kill Redis mid-test</td><td>Bookings continue via the Postgres fallback path; zero double sales</td></tr>
+<tr><td><b>Double-sale attempt</b></td><td>Force two confirms against one seat by bypassing Redis</td><td>Postgres rejects the second; the API returns a clean error, not a 500</td></tr>
+<tr><td><b>Payment after expiry</b></td><td>Expire the hold between capture and commit</td><td>Automatic refund issued; booking marked expired; metric incremented</td></tr>
+<tr><td><b>Cross-tenant seat collision</b></td><td>Two tenants with identical screening and seat UUIDs</td><td>Both succeed independently — the tenant prefix keeps the keys distinct</td></tr>
+</tbody></table>
+
+<h3>13.3 Load profile</h3>
+<p>The load test must reproduce the <em>skew</em>, not merely the volume. A uniformly distributed 800 requests per second tells you almost nothing about how this system behaves in production.</p>
+<div class="code-label">k6 scenario — the blockbuster on-sale</div>
+<pre class="lite"><code>Tenant NYATI      95% of load · 760 rps · one screening · 240 seats
+Tenants OTHERS     5% of load ·  40 rps · ordinary browsing
+
+Ramp: 0 → 800 rps over 30 s, hold 5 min, drop to 50 rps
+
+Pass criteria
+  · other tenants' p95 latency degrades by  < 20%     ← the real test
+  · zero double sales
+  · hold acquisition p99 < 400 ms for ALL tenants
+  · 429s are returned to NYATI, not errors to everyone else</code></pre>
+<p>The first criterion is the one that matters. A system that survives the peak by making every tenant slow has not passed — it has merely failed evenly.</p>
+
+<h3>13.4 The rest</h3>
+<table>
+<thead><tr><th style="width:22%">Level</th><th style="width:14%">Target</th><th>Focus</th></tr></thead>
+<tbody>
+<tr><td>Unit</td><td class="c">~70%</td><td>Pricing, seat-label generation, refund calculation, state-machine transitions</td></tr>
+<tr><td>Integration</td><td class="c">All endpoints</td><td>Real database and Redis; the isolation suite lives here</td></tr>
+<tr><td>Contract</td><td class="c">All providers</td><td>Payment provider responses, including timeouts and duplicate webhooks</td></tr>
+<tr><td>End-to-end</td><td class="c">6 journeys</td><td>Browse → book → pay → scan; refund; schedule; onboard; suspend; offboard</td></tr>
+<tr><td>Onboarding smoke</td><td class="c">Every deploy</td><td>Create a throwaway tenant, exercise it, delete it — the single most informative test in the system</td></tr>
+</tbody></table>

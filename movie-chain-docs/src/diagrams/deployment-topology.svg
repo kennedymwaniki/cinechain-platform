@@ -1,0 +1,43 @@
+<svg viewBox="0 0 720 320" role="img">
+<text class="s-cap" x="0" y="11">One Kubernetes cluster serving every tier</text>
+<rect class="b-dash" x="0" y="20" width="720" height="230" rx="6"/>
+<rect class="b-n" x="12" y="32" width="696" height="26" rx="4"/>
+<text class="s-lbw" x="22" y="49">Ingress — TLS termination, JWT pre-validation, per-tenant rate limit</text>
+
+<rect class="b-am" x="12" y="68" width="220" height="80" rx="5"/>
+<text class="s-cap" x="22" y="84">NAMESPACE: control-plane</text>
+<rect class="b" x="22" y="90" width="200" height="20"/><text class="s-xs mid-a" x="122" y="104">tenant-service   ×2</text>
+<rect class="b" x="22" y="114" width="200" height="20"/><text class="s-xs mid-a" x="122" y="128">onboarding-worker ×2</text>
+<text class="s-xs" x="22" y="144">never scaled by tenant traffic</text>
+
+<rect class="b-bl" x="244" y="68" width="464" height="80" rx="5"/>
+<text class="s-capb" x="254" y="84">NAMESPACE: app-pooled — serves ALL Basic + Standard tenants</text>
+<rect class="b" x="254" y="90" width="108" height="20"/><text class="s-xs mid-a" x="308" y="104">catalogue ×3</text>
+<rect class="b" x="368" y="90" width="108" height="20"/><text class="s-xs mid-a" x="422" y="104">inventory ×6</text>
+<rect class="b" x="482" y="90" width="108" height="20"/><text class="s-xs mid-a" x="536" y="104">booking ×4</text>
+<rect class="b" x="596" y="90" width="102" height="20"/><text class="s-xs mid-a" x="647" y="104">payment ×2</text>
+<rect class="b" x="254" y="114" width="230" height="20"/><text class="s-xs mid-a" x="369" y="128">hold-sweeper ×1 (leader-elected)</text>
+<rect class="b" x="490" y="114" width="208" height="20"/><text class="s-xs mid-a" x="594" y="128">notification-worker ×2</text>
+<text class="s-xs" x="254" y="144">HPA on CPU + queue depth · inventory scales first, it takes the seat-map traffic</text>
+
+<rect class="b-gr" x="12" y="158" width="344" height="80" rx="5"/>
+<text class="s-cap" x="22" y="174">NAMESPACE: app-silo-nyati — one Premium tenant</text>
+<rect class="b" x="22" y="180" width="76" height="20"/><text class="s-xs mid-a" x="60" y="194">catalogue ×2</text>
+<rect class="b" x="104" y="180" width="76" height="20"/><text class="s-xs mid-a" x="142" y="194">inventory ×4</text>
+<rect class="b" x="186" y="180" width="76" height="20"/><text class="s-xs mid-a" x="224" y="194">booking ×2</text>
+<rect class="b" x="268" y="180" width="78" height="20"/><text class="s-xs mid-a" x="307" y="194">payment ×1</text>
+<text class="s-xs" x="22" y="214">Identical images. Identical config keys. Only the values differ —</text>
+<text class="s-xs" x="22" y="228">DB_URL points at their own instance, and ResourceQuota caps the namespace.</text>
+
+<rect class="b-pu" x="368" y="158" width="340" height="80" rx="5"/>
+<text class="s-cap" x="378" y="174">NETWORK POLICY — the boundary that is not code</text>
+<text class="s-xs" x="378" y="192">·  app-silo-* namespaces cannot reach the pooled database at all</text>
+<text class="s-xs" x="378" y="206">·  pooled pods cannot resolve siloed database hostnames</text>
+<text class="s-xs" x="378" y="220">·  control-plane may call both; neither may call back except via the API</text>
+<text class="s-xs" x="378" y="234">A compromised pooled pod cannot reach Nyati's data even with valid credentials.</text>
+
+<rect class="b-w" x="0" y="262" width="720" height="54" rx="5"/>
+<text class="s-hd" x="12" y="280">What makes this affordable</text>
+<text class="s-sm" x="12" y="297">The siloed namespace runs the <b>same container images</b> from the same CI build. A silo is a Helm values file, not a fork. When the</text>
+<text class="s-sm" x="12" y="312">day comes to promote a tenant from pooled to siloed, you create a namespace, migrate their rows, and flip a config value.</text>
+</svg>

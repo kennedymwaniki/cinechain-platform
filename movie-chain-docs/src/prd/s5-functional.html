@@ -1,0 +1,128 @@
+<h2><span class="num">5</span>Functional Requirements</h2>
+<p class="lede">Requirements are numbered <code>FR-n</code> for reference in tickets and tests. Priorities follow MoSCoW: <span class="pill must">MUST</span> ships in v1, <span class="pill should">SHOULD</span> ships if the increment allows, <span class="pill could">COULD</span> is explicitly deferred.</p>
+
+<h3>5.0 Customer identity — guest first</h3>
+<p>The primary booking path requires <b>no account</b>. This is not a concession to lazy users; it is how cinema ticketing actually works, and forcing registration in front of a ticket purchase is the single most reliable way to lose the sale.</p>
+<table>
+<thead><tr><th style="width:9%">ID</th><th style="width:44%">Requirement</th><th style="width:9%">Pri</th><th>Notes and constraints</th></tr></thead>
+<tbody>
+<tr><td>FR-70</td><td>A customer can complete an entire booking — browse, hold, pay, receive a ticket — without creating an account.</td><td><span class="pill must">MUST</span></td><td>Name, e-mail and payment details are collected once, at payment. Nothing else.</td></tr>
+<tr><td>FR-71</td><td>A guest hold is owned by a signed, opaque <code>hold_token</code> issued by the server, not by a user identity.</td><td><span class="pill must">MUST</span></td><td>Contains hold id and expiry; signed so it cannot be altered. Possession is the claim to the seat. See §7.3.</td></tr>
+<tr><td>FR-72</td><td>The ticket delivered by e-mail is a bearer credential: high-entropy, signed, single-use and not enumerable.</td><td><span class="pill must">MUST</span></td><td>Whoever holds it can use it — so it must not be guessable from a booking reference.</td></tr>
+<tr><td>FR-73</td><td>A guest can retrieve a booking via a signed, expiring link, or by booking reference <b>plus</b> the e-mail used.</td><td><span class="pill must">MUST</span></td><td>Reference alone must never be sufficient — that is an enumeration oracle.</td></tr>
+<tr><td>FR-74</td><td>A customer may optionally register a <b>CineChain account</b>, which is platform-level and tied to no chain.</td><td><span class="pill should">SHOULD</span></td><td>Token carries a consumer id and <b>no <code>tenant_id</code></b>. See §6.2.</td></tr>
+<tr><td>FR-75</td><td>A registered customer can browse and book at <b>any</b> chain on the platform with one login.</td><td><span class="pill should">SHOULD</span></td><td>The travelling-customer case. A Nyati regular in Mombasa books at Prestige without a second account.</td></tr>
+<tr><td>FR-76</td><td>A registered customer sees their booking history across all chains they have used.</td><td><span class="pill should">SHOULD</span></td><td>Assembled from their own bookings, scoped by consumer id — never by tenant. RLS holds one tenant per transaction, so a sanctioned <code>SECURITY DEFINER</code> lookup returns <i>pointers</i> (tenant, booking id) only; each chain's rows are then read in that chain's own scoped transaction.</td></tr>
+<tr><td>FR-77</td><td>When a guest later registers with an e-mail they have booked under, their prior bookings are linked to the new account.</td><td><span class="pill should">SHOULD</span></td><td>Keyed on <code>(tenant_id, email)</code> on <code>tenant_customer</code>, but it does not happen by itself: a tenant-scoped job per chain sets <code>consumer_id</code> on matching guest rows. It runs <b>only after the e-mail is verified</b>, otherwise registering someone else's address would inherit their history.</td></tr>
+<tr><td>FR-78</td><td>Loyalty balances accrue <b>per chain</b> and are visible only to the chain that issued them.</td><td><span class="pill could">COULD</span></td><td>Held on <code>tenant_customer</code>, under RLS. One login, independent balances — the Uber/Bolt model.</td></tr>
+<tr><td>FR-79</td><td>No chain can read the platform consumer directory, or determine that a customer also uses another chain.</td><td><span class="pill must">MUST</span></td><td>Enforced structurally: <code>platform.consumer</code> lives outside the tenant boundary. <code>consumer_id</code> is never exposed in tenant-facing APIs.</td></tr>
+</tbody></table>
+
+<div class="box key"><span class="bt">The requirement that drives all of the above</span>
+<p>Grace is a customer <em>of the platform</em> who transacts <em>with</em> chains. She is never a user <em>of</em> a chain. A design in which her identity carries a <code>tenant_id</code> satisfies FR-70 through FR-73 and then fails FR-75 outright — which is why §4.2 separates the three populations before any of this is implemented.</p></div>
+
+<h3>5.1 Tenant and user management</h3>
+<table>
+<thead><tr><th style="width:9%">ID</th><th style="width:44%">Requirement</th><th style="width:9%">Pri</th><th>Notes and constraints</th></tr></thead>
+<tbody>
+<tr><td>FR-1</td><td>An operator can create a tenant by supplying chain name, contact, tier and country.</td><td><span class="pill must">MUST</span></td><td>Control plane. Generates an immutable <code>tenant_id</code> and a URL-safe <code>slug</code>.</td></tr>
+<tr><td>FR-2</td><td>Onboarding runs as a resumable state machine and completes in under 60 seconds.</td><td><span class="pill must">MUST</span></td><td><code>PENDING → PROVISIONING → ACTIVE</code>, with <code>FAILED</code> plus retry and rollback. Every created resource recorded.</td></tr>
+<tr><td>FR-3</td><td>Onboarding creates the tenant's first <code>chain_admin</code> user and sends an activation link.</td><td><span class="pill must">MUST</span></td><td>Link single-use, 24-hour expiry.</td></tr>
+<tr><td>FR-4</td><td>Onboarding seeds default roles, a default pricing rule and a sample theatre.</td><td><span class="pill should">SHOULD</span></td><td>An empty tenant is a poor first impression and generates support load.</td></tr>
+<tr><td>FR-5</td><td>A chain admin can invite, suspend and remove <b>staff</b> users, and assign roles scoped to the chain or to named theatres.</td><td><span class="pill must">MUST</span></td><td>A staff user always belongs to exactly one tenant. Customers are not staff and are not managed here — see §5.0.</td></tr>
+<tr><td>FR-6</td><td>An operator can suspend a tenant: logins blocked, background jobs stopped, data retained.</td><td><span class="pill must">MUST</span></td><td>In-flight holds are released; confirmed bookings are honoured.</td></tr>
+<tr><td>FR-7</td><td>An operator can change a tenant's tier, taking effect within one token lifetime.</td><td><span class="pill should">SHOULD</span></td><td>Limits re-read from config; a tier change may trigger a data migration.</td></tr>
+<tr><td>FR-8</td><td>An operator can export a tenant's complete data and then verifiably delete it.</td><td><span class="pill should">SHOULD</span></td><td>Deletion within 30 days, with a completion report per table.</td></tr>
+</tbody></table>
+
+<h3>5.2 Venue configuration</h3>
+<table>
+<thead><tr><th style="width:9%">ID</th><th style="width:44%">Requirement</th><th style="width:9%">Pri</th><th>Notes and constraints</th></tr></thead>
+<tbody>
+<tr><td>FR-10</td><td>A manager can create theatres with name, town, address, timezone and contact details.</td><td><span class="pill must">MUST</span></td><td>Timezone per theatre — a chain may cross zones, and screenings are local-time concepts.</td></tr>
+<tr><td>FR-11</td><td>A manager can create screens within a theatre with a name, format and capacity.</td><td><span class="pill must">MUST</span></td><td>Formats: Standard, IMAX, 3D, VIP, Drive-in.</td></tr>
+<tr><td>FR-12</td><td>A manager can generate a seat layout from rows &times; seats-per-row, then adjust individual seats.</td><td><span class="pill must">MUST</span></td><td>Adjustments: remove a seat, mark as aisle/gap, change seat class, mark accessible.</td></tr>
+<tr><td>FR-13</td><td>Seats carry a class (Standard, VIP, Accessible, Companion) that participates in pricing.</td><td><span class="pill must">MUST</span></td><td>Class is a property of the seat, not of the screening.</td></tr>
+<tr><td>FR-14</td><td>A screen's layout cannot be changed while it has future screenings with sold tickets.</td><td><span class="pill must">MUST</span></td><td>Prevents a sold seat ceasing to exist. Managers must cancel or let screenings complete first.</td></tr>
+<tr><td>FR-15</td><td>A manager can mark a screen temporarily out of service.</td><td><span class="pill should">SHOULD</span></td><td>Blocks new screenings; existing ones must be explicitly cancelled.</td></tr>
+</tbody></table>
+
+<h3>5.3 Catalogue and scheduling</h3>
+<table>
+<thead><tr><th style="width:9%">ID</th><th style="width:44%">Requirement</th><th style="width:9%">Pri</th><th>Notes and constraints</th></tr></thead>
+<tbody>
+<tr><td>FR-20</td><td>A chain admin can add films with title, synopsis, runtime, rating, language, poster and release date.</td><td><span class="pill must">MUST</span></td><td>Film records are tenant-scoped: each chain curates its own catalogue.</td></tr>
+<tr><td>FR-21</td><td>A manager can schedule a screening: film, screen, start time, base price.</td><td><span class="pill must">MUST</span></td><td>End time derived from runtime plus a configurable trailer allowance.</td></tr>
+<tr><td>FR-22</td><td>The system rejects any screening that overlaps another on the same screen, including a configurable turnaround gap.</td><td><span class="pill must">MUST</span></td><td>Default turnaround 20 minutes. Enforced by a database exclusion constraint, not only in application code.</td></tr>
+<tr><td>FR-23</td><td>A manager can schedule the same film multiple times per day on one screen, and across several screens.</td><td><span class="pill must">MUST</span></td><td>The core scheduling case: four showings of one blockbuster in one theatre.</td></tr>
+<tr><td>FR-24</td><td>A manager can copy a day's or a week's schedule forward.</td><td><span class="pill should">SHOULD</span></td><td>Scheduling is repetitive; this is the feature managers ask for first.</td></tr>
+<tr><td>FR-25</td><td>Screenings have a lifecycle: <code>DRAFT → PUBLISHED → CLOSED → COMPLETED</code>, plus <code>CANCELLED</code>.</td><td><span class="pill must">MUST</span></td><td>Only <code>PUBLISHED</code> screenings are sellable. <code>CLOSED</code> stops sales at start time plus a grace period.</td></tr>
+<tr><td>FR-26</td><td>Cancelling a screening refunds every ticket automatically and notifies every affected customer.</td><td><span class="pill must">MUST</span></td><td>Must be idempotent and produce a full audit trail.</td></tr>
+<tr><td>FR-27</td><td>Pricing rules set a price per seat class per screening, effective-dated.</td><td><span class="pill must">MUST</span></td><td>Price is captured onto the ticket at purchase; later rule changes never alter sold tickets.</td></tr>
+</tbody></table>
+
+<h3>5.4 Discovery and browsing</h3>
+<table>
+<thead><tr><th style="width:9%">ID</th><th style="width:44%">Requirement</th><th style="width:9%">Pri</th><th>Notes and constraints</th></tr></thead>
+<tbody>
+<tr><td>FR-30</td><td>A customer can browse films showing in a chosen town over a date range.</td><td><span class="pill must">MUST</span></td><td>Public endpoint, tenant resolved from subdomain or explicit selection.</td></tr>
+<tr><td>FR-31</td><td>A customer can view all showtimes for a film, grouped by theatre, with sold-out states marked.</td><td><span class="pill must">MUST</span></td><td>Availability counts may be cached for up to 10 seconds.</td></tr>
+<tr><td>FR-32</td><td>A customer can view a screening's seat map showing available, taken and their own selected seats.</td><td><span class="pill must">MUST</span></td><td>HELD-by-others and SOLD both render as &ldquo;taken&rdquo;. Never disclose that a seat is merely under consideration.</td></tr>
+<tr><td>FR-33</td><td>The seat map updates live as other customers take seats.</td><td><span class="pill should">SHOULD</span></td><td>WebSocket push, with polling fallback every 5 seconds.</td></tr>
+<tr><td>FR-34</td><td>A customer can search films by title and filter by language, rating and format.</td><td><span class="pill should">SHOULD</span></td><td>Postgres full-text search is sufficient at this scale.</td></tr>
+</tbody></table>
+
+<h3>5.5 Seat selection and holds</h3>
+<p>This group is the heart of the system and is specified in full in Section 7. The requirements are stated here for completeness.</p>
+<table>
+<thead><tr><th style="width:9%">ID</th><th style="width:44%">Requirement</th><th style="width:9%">Pri</th><th>Notes and constraints</th></tr></thead>
+<tbody>
+<tr><td>FR-40</td><td>A customer can select one or more available seats and place a hold on them.</td><td><span class="pill must">MUST</span></td><td>Maximum 10 seats per hold, configurable per tenant.</td></tr>
+<tr><td>FR-41</td><td>A hold lasts <b>300 seconds</b> and is configurable per tenant between 120 and 900 seconds.</td><td><span class="pill must">MUST</span></td><td>The countdown shown to the customer derives from a server-supplied <code>expires_at</code>.</td></tr>
+<tr><td>FR-42</td><td>A held seat is unavailable to every other customer of that tenant for the duration of the hold.</td><td><span class="pill must">MUST</span></td><td>Including box-office terminals — one inventory, no exceptions.</td></tr>
+<tr><td>FR-43</td><td>A seat can be held by at most one party at any instant. Concurrent attempts must yield exactly one winner.</td><td><span class="pill must">MUST</span></td><td>Enforced by an atomic operation, not by read-then-write. See §7.2.</td></tr>
+<tr><td>FR-44</td><td>An expired hold releases its seats automatically, with no user action and no scheduled job on the critical path.</td><td><span class="pill must">MUST</span></td><td>Redis TTL is the mechanism; a sweeper reconciles the durable record.</td></tr>
+<tr><td>FR-45</td><td>A customer may extend a hold once, by 120 seconds, if no other customer is waiting on those seats.</td><td><span class="pill should">SHOULD</span></td><td>Reduces abandonment at the payment step without allowing indefinite squatting.</td></tr>
+<tr><td>FR-46</td><td>A customer may release a hold explicitly by leaving the seat-selection page.</td><td><span class="pill should">SHOULD</span></td><td>Returns inventory sooner than TTL expiry.</td></tr>
+<tr><td>FR-47</td><td>Holds must not leave a single isolated empty seat between two bookings where avoidable.</td><td><span class="pill could">COULD</span></td><td>Seat-gap prevention, <b>driven by demand</b>. Enforced only when projected occupancy reaches a per-tenant threshold (default 60&nbsp;%) and the screening is more than 30&nbsp;min away. A sell-out opening night protects every seat; a quiet showing a week later never blocks a customer's choice. Rejects only when a gap-free block of the same size and class exists, and offers it. Advisory, never a sale guarantee. Implementation plan step 13.</td></tr>
+<tr><td>FR-48</td><td>Box-office holds may be created with a shorter window and are attributed to the clerk.</td><td><span class="pill should">SHOULD</span></td><td>Default 90 seconds — the customer is standing there.</td></tr>
+</tbody></table>
+
+<h4>The seat-selection screen</h4>
+<figure class="fig-wide">{{d:seat-map-ui}}<figcaption><b>Figure 5.1.</b> The screen that determines whether this product succeeds. The countdown is not decoration — it is the visible face of the Redis TTL described in §7.3.</figcaption></figure>
+
+<p>Four details on this screen carry disproportionate weight, and each has a requirement behind it:</p>
+<ul class="clean">
+<li><b>The countdown is rendered from the server's <code>expires_at</code></b>, never from a client-side timer started on page load. A client timer drifts, survives a laptop sleeping, and will eventually tell a customer they have two minutes left when the seats went thirty seconds ago.</li>
+<li><b>Taken seats are greyed, never hidden.</b> People navigate a seat map by its shape. Removing seats changes the geometry and makes the auditorium unrecognisable.</li>
+<li><b>Held and sold look identical.</b> Distinguishing them would leak live demand data to anyone who opens the page, including competitors.</li>
+<li><b>The map updates without a refresh.</b> Nothing erodes trust faster than clicking a seat that was sold twenty seconds ago and being told it is unavailable.</li>
+</ul>
+
+<h3>5.6 Payment and ticketing</h3>
+<table>
+<thead><tr><th style="width:9%">ID</th><th style="width:44%">Requirement</th><th style="width:9%">Pri</th><th>Notes and constraints</th></tr></thead>
+<tbody>
+<tr><td>FR-50</td><td>A customer can pay for a held booking by card or M-Pesa.</td><td><span class="pill must">MUST</span></td><td>Provider-agnostic interface; at least one of each in v1.</td></tr>
+<tr><td>FR-51</td><td>Payment initiation is idempotent, keyed on the hold identifier.</td><td><span class="pill must">MUST</span></td><td>A retried request must never charge twice.</td></tr>
+<tr><td>FR-52</td><td>Seats convert from HELD to SOLD only after payment is confirmed, in a single database transaction with the booking.</td><td><span class="pill must">MUST</span></td><td>No partially-confirmed bookings may exist at any point.</td></tr>
+<tr><td>FR-53</td><td>If payment succeeds but the hold has expired and the seats are gone, the payment is automatically refunded and the customer told clearly.</td><td><span class="pill must">MUST</span></td><td>The most important failure path in the system. See §7.4.</td></tr>
+<tr><td>FR-54</td><td>A confirmed booking issues one ticket per seat, each with a unique scannable code.</td><td><span class="pill must">MUST</span></td><td>Codes are signed and single-use; not guessable by enumeration.</td></tr>
+<tr><td>FR-55</td><td>Tickets are delivered by SMS and e-mail within 30 seconds, and are always retrievable in the booking view.</td><td><span class="pill must">MUST</span></td><td>Delivery failure must not fail the booking.</td></tr>
+<tr><td>FR-56</td><td>Payment provider webhooks are verified, idempotent and tenant-attributed.</td><td><span class="pill must">MUST</span></td><td>Webhooks arrive with no user session; tenant context comes from the stored payment record.</td></tr>
+<tr><td>FR-57</td><td>A clerk can take cash and record the tender type.</td><td><span class="pill must">MUST</span></td><td>Same booking flow, different settlement: a cash provider settles immediately, <code>payment.tender_type</code> is recorded with the clerk's id.</td></tr>
+</tbody></table>
+
+<h3>5.7 Admission, refunds and reporting</h3>
+<table>
+<thead><tr><th style="width:9%">ID</th><th style="width:44%">Requirement</th><th style="width:9%">Pri</th><th>Notes and constraints</th></tr></thead>
+<tbody>
+<tr><td>FR-60</td><td>A clerk can scan a ticket and receive a clear valid / already-used / wrong-screening / wrong-day result.</td><td><span class="pill must">MUST</span></td><td>Scan marks the ticket REDEEMED atomically; a second scan is rejected.</td></tr>
+<tr><td>FR-61</td><td>Admission decisions are recorded with time, device and operator.</td><td><span class="pill should">SHOULD</span></td><td>Needed for disputes at the door.</td></tr>
+<tr><td>FR-62</td><td>A customer can cancel a booking within the chain's policy window and be refunded.</td><td><span class="pill should">SHOULD</span></td><td>Window configured per tenant; default 2 hours before start.</td></tr>
+<tr><td>FR-63</td><td>A refunded seat returns to sale immediately.</td><td><span class="pill should">SHOULD</span></td><td><code>seat_lock</code> row deleted; seat map updated.</td></tr>
+<tr><td>FR-64</td><td>Refunds are idempotent and never exceed the amount captured.</td><td><span class="pill must">MUST</span></td><td>Partial refunds supported for multi-seat bookings.</td></tr>
+<tr><td>FR-65</td><td>A manager can see live occupancy per screening; a chain admin can see revenue and occupancy across all theatres.</td><td><span class="pill must">MUST</span></td><td>Strictly tenant-scoped, including every aggregate.</td></tr>
+<tr><td>FR-66</td><td>Reports can be exported as CSV.</td><td><span class="pill should">SHOULD</span></td><td>Generated asynchronously; download link expires.</td></tr>
+<tr><td>FR-67</td><td>The platform emits per-tenant consumption metrics for metering.</td><td><span class="pill must">MUST</span></td><td>Feeds billing and cost-per-tenant in §14.</td></tr>
+</tbody></table>

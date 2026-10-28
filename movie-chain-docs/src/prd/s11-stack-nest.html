@@ -1,0 +1,48 @@
+<h2><span class="num">11</span>Technology Stack — NestJS Edition</h2>
+<p class="lede">Every component below is chosen for a stated reason. Where the reason is &ldquo;it is what the team knows&rdquo;, that is said plainly — it is a legitimate reason and a better one than a fashionable choice nobody can operate.</p>
+
+<h3>11.1 Core choices</h3>
+<table class="lg">
+<thead><tr><th style="width:20%">Concern</th><th style="width:24%">Choice</th><th>Why this, and what we considered</th></tr></thead>
+<tbody>
+<tr><td><b>Language</b></td><td>TypeScript 5.x on Node 22 LTS</td><td>One language across API and web client. Strict mode is non-negotiable — a branded <code>TenantId</code> type catches a whole class of mistake at compile time.</td></tr>
+<tr><td><b>Framework</b></td><td>NestJS 11</td><td>Chosen specifically for its interceptor and guard pipeline, which maps one-to-one onto the interception patterns multi-tenancy requires. The dependency-injection container also makes request-scoped tenant context natural rather than bolted on.</td></tr>
+<tr><td><b>Database</b></td><td>PostgreSQL 17</td><td>Row-level security is the decisive feature. Also gives us the exclusion constraint for FR-22, <code>tstzrange</code>, partitioning and strong JSON support. MySQL has no comparable RLS.</td></tr>
+<tr><td><b>Query layer</b></td><td>Drizzle ORM</td><td>Generates SQL you can read, which matters enormously when auditing tenant scoping. Prisma is the popular alternative but its connection handling makes per-request <code>SET LOCAL</code> awkward — a decisive objection here.</td></tr>
+<tr><td><b>Migrations</b></td><td><code>drizzle-kit</code> + raw SQL for policies</td><td>RLS policies and exclusion constraints are written as raw SQL and version-controlled alongside generated migrations.</td></tr>
+<tr><td><b>Cache &amp; locks</b></td><td>Redis 7 (<code>ioredis</code>)</td><td>Atomic <code>SET NX EX</code> and Lua scripting are exactly what §7.3 requires. Cluster mode from the start, since keys are already tenant-prefixed.</td></tr>
+<tr><td><b>Jobs</b></td><td>BullMQ</td><td>Redis-backed, so no additional infrastructure. Per-tenant queue prefixes give fair processing across tenants.</td></tr>
+<tr><td><b>Auth</b></td><td>Keycloak</td><td>Self-hostable, supports custom claims and realm-per-tenant if ever needed. Auth0 is easier but prices per active user, which is punitive for a consumer ticketing flow.</td></tr>
+<tr><td><b>Real-time</b></td><td>Socket.IO with Redis adapter</td><td>Seat-map push (FR-33). Rooms are namespaced per tenant and screening.</td></tr>
+<tr><td><b>Validation</b></td><td>Zod + <code>nestjs-zod</code></td><td>One schema produces both runtime validation and the TypeScript type.</td></tr>
+<tr><td><b>Logging</b></td><td>Pino</td><td>Fast structured JSON; child loggers carry tenant context without call-site effort.</td></tr>
+<tr><td><b>Tracing</b></td><td>OpenTelemetry → Tempo</td><td>Tenant as a root-span attribute.</td></tr>
+<tr><td><b>Metrics</b></td><td>Prometheus + Grafana</td><td>Tenant as a label, with the long tail bucketed to control cardinality.</td></tr>
+<tr><td><b>Testing</b></td><td>Vitest + Testcontainers + k6</td><td>Testcontainers gives a real PostgreSQL with real RLS — isolation cannot be meaningfully tested against a mock.</td></tr>
+<tr><td><b>Web client</b></td><td>Next.js 15 + TanStack Query</td><td>Server rendering for film pages (they should be indexable); client state for the seat map.</td></tr>
+<tr><td><b>Deployment</b></td><td>Docker → Kubernetes, Helm</td><td>One chart, one values file per tier. A silo is a values file.</td></tr>
+</tbody></table>
+
+<h3>11.2 Project structure</h3>
+<pre class="lite"><code>cinechain/
+├─ apps/
+│  ├─ api/                    # application plane
+│  │  └─ src/
+│  │     ├─ tenancy/          # ◀ the security core — review every change
+│  │     │  ├─ tenant-context.ts        # AsyncLocalStorage store
+│  │     │  ├─ tenant.interceptor.ts    # extracts claim, opens scoped tx
+│  │     │  ├─ tenant-db.provider.ts    # resolves pooled vs siloed
+│  │     │  └─ tenant.guard.ts
+│  │     ├─ catalogue/        # films, screenings, pricing
+│  │     ├─ inventory/        # seat maps, holds  ◀ the hot path
+│  │     ├─ booking/          # orders, tickets, refunds
+│  │     ├─ payment/          # providers, webhooks
+│  │     └─ notification/
+│  ├─ control-plane/          # SEPARATE app, separate credentials
+│  └─ web/                    # Next.js
+├─ packages/
+│  ├─ db/                     # schema, migrations, RLS policies
+│  └─ shared/                 # types, money, errors
+└─ deploy/helm/</code></pre>
+<div class="box note"><span class="bt">On the <code>tenancy/</code> directory</span>
+<p>Keeping every tenancy mechanism in one directory is a deliberate organisational choice. It gives you a small, stable surface to protect: a CODEOWNERS rule requiring senior review on that path, a dedicated test suite, and an obvious place for a new engineer to read first. Tenancy logic scattered across forty files cannot be reviewed, only hoped about.</p></div>

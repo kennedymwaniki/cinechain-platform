@@ -1,0 +1,274 @@
+<h2><span class="num">12</span>Implementation Guide — Go</h2>
+
+<figure>{{d:go-pipeline}}<figcaption><b>Figure 12.1.</b> Where tenancy attaches to the Gin middleware chain. The position is identical to the other edition; only the machinery differs.</figcaption></figure>
+
+<h3>12.1 Tenant context</h3>
+<p>An unexported key type makes it impossible for another package to write to this context slot by accident — a small detail that removes a whole class of confusion.</p>
+<div class="code-label">internal/tenancy/context.go</div>
+<pre><code><span class="kw">package</span> tenancy
+
+<span class="kw">type</span> TenantID <span class="kw">string</span>
+
+<span class="kw">type</span> Context <span class="kw">struct</span> {
+	TenantID    TenantID
+	Tier        <span class="kw">string</span>
+	UserID      <span class="kw">string</span>
+	Role        <span class="kw">string</span>
+	HoldSeconds <span class="kw">int</span>
+	MaxSeats    <span class="kw">int</span>
+}
+
+<span class="cm">// unexported key type: no other package can collide with or overwrite it</span>
+<span class="kw">type</span> ctxKey <span class="kw">struct</span>{}
+
+<span class="kw">func</span> <span class="fn">With</span>(ctx context.Context, tc Context) context.Context {
+	<span class="kw">return</span> context.WithValue(ctx, ctxKey{}, tc)
+}
+
+<span class="cm">// FromContext returns an error rather than a zero value. A missing tenant</span>
+<span class="cm">// is a bug; returning TenantID("") would silently query nothing — or,</span>
+<span class="cm">// with a privileged role, everything.</span>
+<span class="kw">func</span> <span class="fn">FromContext</span>(ctx context.Context) (Context, <span class="kw">error</span>) {
+	tc, ok := ctx.Value(ctxKey{}).(Context)
+	<span class="kw">if</span> !ok || tc.TenantID == <span class="st">""</span> {
+		<span class="kw">return</span> Context{}, ErrNoTenantContext
+	}
+	<span class="kw">return</span> tc, <span class="kw">nil</span>
+}
+
+<span class="cm">// MustFromContext is for code paths that cannot proceed without a tenant.</span>
+<span class="kw">func</span> <span class="fn">MustFromContext</span>(ctx context.Context) Context {
+	tc, err := FromContext(ctx)
+	<span class="kw">if</span> err != <span class="kw">nil</span> { <span class="fn">panic</span>(<span class="st">"tenancy: "</span> + err.Error()) }
+	<span class="kw">return</span> tc
+}</code></pre>
+
+<div class="code-label">internal/tenancy/middleware.go</div>
+<pre><code><span class="kw">func</span> <span class="fn">Middleware</span>(reg *Registry, aud *audit.Logger) gin.HandlerFunc {
+	<span class="kw">return func</span>(c *gin.Context) {
+		claims, ok := auth.ClaimsFrom(c)      <span class="cm">// set by AuthMiddleware</span>
+		<span class="kw">if</span> !ok || claims.TenantID == <span class="st">""</span> {
+			c.AbortWithStatusJSON(401, gin.H{<span class="st">"error"</span>: <span class="st">"no_tenant_context"</span>})
+			<span class="kw">return</span>
+		}
+
+		<span class="cm">// Guards STAFF endpoints only. A consumer token legitimately has no</span>
+		<span class="cm">// tenant claim (§4.2) and goes through ConsumerOnly instead.</span>
+		<span class="cm">// A tenant named in the path is a hint. The token is the authority.</span>
+		<span class="kw">if</span> hinted := c.Param(<span class="st">"tenantSlug"</span>); hinted != <span class="st">""</span> &amp;&amp; hinted != claims.TenantSlug {
+			aud.<span class="fn">SecurityEvent</span>(c, <span class="st">"tenant_mismatch"</span>, claims.TenantID, hinted)
+			c.<span class="fn">AbortWithStatus</span>(404)            <span class="cm">// 404, not 403 — see §8.4</span>
+			<span class="kw">return</span>
+		}
+
+		cfg, err := reg.<span class="fn">Get</span>(c.Request.Context(), TenantID(claims.TenantID))
+		<span class="kw">if</span> err != <span class="kw">nil</span> || cfg.Status != <span class="st">"active"</span> {
+			c.<span class="fn">AbortWithStatus</span>(403)
+			<span class="kw">return</span>
+		}
+
+		tc := Context{
+			TenantID: cfg.ID, Tier: cfg.Tier, UserID: claims.Subject,
+			Role: claims.Role, HoldSeconds: cfg.HoldSeconds, MaxSeats: cfg.MaxSeats,
+		}
+		<span class="cm">// Replace the request context — everything downstream inherits it.</span>
+		c.Request = c.Request.<span class="fn">WithContext</span>(<span class="fn">With</span>(c.Request.Context(), tc))
+		c.<span class="fn">Next</span>()
+	}
+}</code></pre>
+
+<h3>12.2 The consumer path — no tenant claim at all</h3>
+<p>Consumer endpoints cannot use the middleware above: a consumer token deliberately carries no tenant, and a guest carries no token at all. The tenant is derived from the resource instead.</p>
+
+<div class="code-label">internal/tenancy/consumer.go</div>
+<pre><code><span class="cm">// ConsumerOnly guards the public booking surface. It accepts an</span>
+<span class="cm">// anonymous request, accepts a consumer token, and REFUSES a staff</span>
+<span class="cm">// token — that would let a Nyati clerk transact as a Prestige customer.</span>
+<span class="kw">func</span> <span class="fn">ConsumerOnly</span>(aud *audit.Logger) gin.HandlerFunc {
+	<span class="kw">return func</span>(c *gin.Context) {
+		claims, ok := auth.<span class="fn">ClaimsFrom</span>(c)
+		<span class="kw">if</span> ok &amp;&amp; claims.TenantID != <span class="st">""</span> {
+			aud.<span class="fn">SecurityEvent</span>(c, <span class="st">"wrong_token_type"</span>, claims.TenantID, c.FullPath())
+			c.<span class="fn">AbortWithStatusJSON</span>(403, gin.H{<span class="st">"error"</span>: <span class="st">"wrong_token_type"</span>})
+			<span class="kw">return</span>
+		}
+		<span class="cm">// Guests are fine: consumerID stays empty. Ownership of a seat is</span>
+		<span class="cm">// proved by the signed hold token, not by identity.</span>
+		<span class="kw">var</span> consumerID <span class="kw">string</span>
+		<span class="kw">if</span> ok { consumerID = claims.Subject }
+		c.Request = c.Request.<span class="fn">WithContext</span>(
+			context.<span class="fn">WithValue</span>(c.Request.<span class="fn">Context</span>(), consumerKey{}, consumerID))
+		c.<span class="fn">Next</span>()
+	}
+}</code></pre>
+
+<div class="code-label">internal/inventory/handler.go — where the tenant actually comes from</div>
+<pre><code><span class="kw">func</span> (h *Handler) <span class="fn">CreateHold</span>(c *gin.Context) {
+	ctx := c.Request.<span class="fn">Context</span>()
+	screeningID := c.<span class="fn">Param</span>(<span class="st">"id"</span>)
+
+	<span class="cm">// The caller supplied an object id. WE supply the tenant, by reading</span>
+	<span class="cm">// our own row. The caller's opinion of the tenant is never consulted —</span>
+	<span class="cm">// note there is nowhere in this handler for such a value to enter.</span>
+	scr, err := h.catalogue.<span class="fn">PublicScreening</span>(ctx, screeningID)
+	<span class="kw">if</span> err != <span class="kw">nil</span> { c.<span class="fn">AbortWithStatus</span>(404); <span class="kw">return</span> }
+
+	cfg, err := h.reg.<span class="fn">Get</span>(ctx, scr.TenantID)
+	<span class="kw">if</span> err != <span class="kw">nil</span> { c.<span class="fn">AbortWithStatus</span>(503); <span class="kw">return</span> }
+
+	<span class="cm">// From here down it is byte-identical to the staff path.</span>
+	ctx = tenancy.<span class="fn">With</span>(ctx, tenancy.Context{
+		TenantID: cfg.ID, Tier: cfg.Tier, Role: <span class="st">"consumer"</span>,
+		HoldSeconds: cfg.HoldSeconds, MaxSeats: cfg.MaxSeats,
+	})
+
+	<span class="kw">var</span> req HoldRequest
+	<span class="kw">if</span> err := c.<span class="fn">ShouldBindJSON</span>(&amp;req); err != <span class="kw">nil</span> { c.<span class="fn">AbortWithStatus</span>(400); <span class="kw">return</span> }
+
+	hold, err := h.svc.<span class="fn">Acquire</span>(ctx, screeningID, req.SeatIDs)
+	<span class="cm">// ... 409 on conflict, 201 with the signed hold_token otherwise</span>
+}</code></pre>
+
+<div class="box key"><span class="bt">Why this is not &ldquo;trusting the URL&rdquo;</span>
+<p>Chapter 6 of the masterclass forbids taking the tenant from the request. This does not: the caller supplies <code>screeningID</code>, an <em>object identifier</em>, and the server derives the tenant from its own row. What would be forbidden is accepting a <code>tenant_id</code> supplied alongside it.</p>
+<p>Go makes the safety of this unusually visible. Because <code>tenancy.With</code> returns a new <code>ctx</code> and every store method takes <code>ctx</code>, a reviewer can see in one screen exactly where the tenant entered and that nothing downstream can change it.</p></div>
+
+<h3>12.3 Data access and isolation</h3>
+<p>The critical subtlety in Go: <code>SET LOCAL</code> must execute on the <em>same physical connection</em> as the subsequent queries. With a pool, that means acquiring a connection explicitly and holding it for the transaction rather than letting the pool hand out a fresh one per statement.</p>
+<div class="code-label">internal/tenancy/db.go</div>
+<pre><code><span class="kw">type</span> DB <span class="kw">struct</span> {
+	pools <span class="kw">map</span>[<span class="kw">string</span>]*pgxpool.Pool   <span class="cm">// "__pooled__" plus one per silo</span>
+	mu    sync.RWMutex
+	reg   *Registry
+}
+
+<span class="cm">// WithTenant runs fn inside a transaction scoped to the caller's tenant.</span>
+<span class="cm">// It is the ONLY way the application reaches the database.</span>
+<span class="kw">func</span> (d *DB) <span class="fn">WithTenant</span>(ctx context.Context, fn <span class="kw">func</span>(pgx.Tx) <span class="kw">error</span>) <span class="kw">error</span> {
+	tc, err := <span class="fn">FromContext</span>(ctx)
+	<span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> err }          <span class="cm">// fail closed</span>
+
+	cfg, err := d.reg.<span class="fn">Get</span>(ctx, tc.TenantID)
+	<span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+
+	<span class="cm">// Pooled tenants share one pool; siloed tenants get their own.</span>
+	<span class="cm">// Callers cannot tell which they received — and must not need to.</span>
+	pool := d.<span class="fn">poolFor</span>(cfg.DBRef)
+
+	conn, err := pool.<span class="fn">Acquire</span>(ctx)             <span class="cm">// hold ONE connection</span>
+	<span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+	<span class="kw">defer</span> conn.<span class="fn">Release</span>()
+
+	tx, err := conn.<span class="fn">Begin</span>(ctx)
+	<span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+	<span class="kw">defer</span> tx.<span class="fn">Rollback</span>(ctx)                    <span class="cm">// no-op after Commit</span>
+
+	<span class="cm">// SET LOCAL: scoped to this transaction. A plain SET would persist</span>
+	<span class="cm">// on the pooled connection and leak into the next request.</span>
+	<span class="kw">if</span> _, err := tx.<span class="fn">Exec</span>(ctx, <span class="st">"SET LOCAL app.tenant_id = $1"</span>, <span class="kw">string</span>(tc.TenantID)); err != <span class="kw">nil</span> {
+		<span class="kw">return</span> err
+	}
+	<span class="kw">if</span> err := <span class="fn">fn</span>(tx); err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+	<span class="kw">return</span> tx.<span class="fn">Commit</span>(ctx)
+}</code></pre>
+
+<div class="box warn"><span class="bt">The Go-specific trap</span>
+<p><code>pool.Exec(ctx, …)</code> acquires an arbitrary connection from the pool, runs one statement, and releases it. If <code>SET LOCAL</code> is issued that way, it applies to a connection that is immediately returned to the pool — and the query that follows runs on a different connection with no tenant set. Under RLS that returns zero rows, which developers then &ldquo;fix&rdquo; by connecting as a privileged role, at which point isolation is gone entirely.</p>
+<p>Always <code>Acquire</code> a connection and hold it. Forbid direct <code>pool.Query</code> / <code>pool.Exec</code> outside <code>internal/tenancy</code> with a lint rule, and write a test that proves a query outside <code>WithTenant</code> returns no rows.</p></div>
+
+<h3>12.4 The hold service</h3>
+<div class="code-label">internal/inventory/hold.go</div>
+<pre><code><span class="kw">var</span> acquireScript = redis.<span class="fn">NewScript</span>(<span class="st">`
+  for i = 1, #KEYS do
+    if redis.call('EXISTS', KEYS[i]) == 1 then return {0, i} end
+  end
+  for i = 1, #KEYS do
+    redis.call('SET', KEYS[i], ARGV[1], 'NX', 'EX', ARGV[2])
+  end
+  return {1, 0}`</span>)
+
+<span class="kw">func</span> <span class="fn">lockKey</span>(t tenancy.TenantID, screening, seat <span class="kw">string</span>) <span class="kw">string</span> {
+	<span class="kw">return</span> fmt.<span class="fn">Sprintf</span>(<span class="st">"lock:t:%s:scr:%s:seat:%s"</span>, t, screening, seat)  <span class="cm">// tenant first</span>
+}
+
+<span class="kw">func</span> (s *Service) <span class="fn">Acquire</span>(ctx context.Context, screeningID <span class="kw">string</span>, seatIDs []<span class="kw">string</span>) (*Hold, <span class="kw">error</span>) {
+	tc := tenancy.<span class="fn">MustFromContext</span>(ctx)
+	<span class="kw">if</span> <span class="fn">len</span>(seatIDs) &gt; tc.MaxSeats {
+		<span class="kw">return nil</span>, ErrTooManySeats
+	}
+
+	holdID := uuid.<span class="fn">New</span>().<span class="fn">String</span>()
+	keys := <span class="fn">make</span>([]<span class="kw">string</span>, <span class="fn">len</span>(seatIDs))
+	<span class="kw">for</span> i, id := <span class="kw">range</span> seatIDs {
+		keys[i] = <span class="fn">lockKey</span>(tc.TenantID, screeningID, id)
+	}
+
+	<span class="cm">// 1 · Atomic across every seat — all or nothing.</span>
+	res, err := acquireScript.<span class="fn">Run</span>(ctx, s.rdb, keys, holdID, tc.HoldSeconds).<span class="fn">Slice</span>()
+	<span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return nil</span>, err }
+	<span class="kw">if</span> res[0].(<span class="kw">int64</span>) == 0 {
+		<span class="kw">return nil</span>, &amp;ConflictError{SeatID: seatIDs[res[1].(<span class="kw">int64</span>)-1]}
+	}
+
+	expiresAt := time.<span class="fn">Now</span>().<span class="fn">Add</span>(time.<span class="fn">Duration</span>(tc.HoldSeconds) * time.Second)
+
+	<span class="cm">// 2 · Durable record. The composite primary key is the real guarantee:</span>
+	<span class="cm">//     if Redis ever admits two winners, Postgres rejects the second.</span>
+	err = s.db.<span class="fn">WithTenant</span>(ctx, <span class="kw">func</span>(tx pgx.Tx) <span class="kw">error</span> {
+		<span class="kw">return</span> s.q.<span class="fn">WithTx</span>(tx).<span class="fn">InsertSeatLocks</span>(ctx, db.InsertSeatLocksParams{
+			ScreeningID: screeningID, SeatIds: seatIDs,
+			TenantID: <span class="kw">string</span>(tc.TenantID), HoldID: holdID, ExpiresAt: expiresAt,
+		})
+	})
+	<span class="kw">if</span> err != <span class="kw">nil</span> {
+		s.rdb.<span class="fn">Del</span>(ctx, keys...)      <span class="cm">// never strand the seats</span>
+		<span class="kw">return nil</span>, err
+	}
+	<span class="kw">return</span> &amp;Hold{ID: holdID, ExpiresAt: expiresAt}, <span class="kw">nil</span>
+}</code></pre>
+
+<h3>12.5 Auditable SQL with sqlc</h3>
+<p>The advantage of generating Go from SQL is that the tenant scoping sits in a reviewable file rather than behind a builder. Note that these queries do <b>not</b> carry a <code>tenant_id</code> predicate — RLS supplies it. That is deliberate, and the comment says so, because a reviewer's first instinct is to assume it was forgotten.</p>
+<div class="code-label">db/queries/booking.sql</div>
+<pre><code><span class="cm">-- name: GetBooking :one</span>
+<span class="cm">-- No tenant_id predicate here. Row-level security adds it from</span>
+<span class="cm">-- app.tenant_id, set by tenancy.DB.WithTenant. Adding it again would</span>
+<span class="cm">-- duplicate the boundary in application code and hide RLS failures</span>
+<span class="cm">-- from our tests. See PRD §6.4.</span>
+<span class="kw">SELECT</span> * <span class="kw">FROM</span> booking <span class="kw">WHERE</span> id = $1;
+
+<span class="cm">-- name: InsertSeatLocks :exec</span>
+<span class="kw">INSERT INTO</span> seat_lock (screening_id, seat_id, tenant_id, status, hold_id, expires_at)
+<span class="kw">SELECT</span> @screening_id, unnest(@seat_ids::uuid[]), @tenant_id, <span class="st">'held'</span>, @hold_id, @expires_at
+<span class="kw">ON CONFLICT</span> (screening_id, seat_id) <span class="kw">DO NOTHING</span>;
+
+<span class="cm">-- name: ConfirmSeatLocks :many</span>
+<span class="kw">UPDATE</span> seat_lock
+   <span class="kw">SET</span> status = <span class="st">'sold'</span>, expires_at = <span class="kw">NULL</span>, booking_id = @booking_id
+ <span class="kw">WHERE</span> hold_id = @hold_id <span class="kw">AND</span> status = <span class="st">'held'</span>
+<span class="kw">RETURNING</span> seat_id;</code></pre>
+
+<h3>12.6 Workers and the sweeper</h3>
+<div class="box warn"><span class="bt">Workers have no request, therefore no tenant in context</span>
+<p>An <code>asynq</code> handler receives a bare <code>context.Context</code>. <code>FromContext</code> will return <code>ErrNoTenantContext</code>, which is correct fail-closed behaviour. Every job payload must carry its <code>tenant_id</code>, and every handler must call <code>tenancy.With</code> before touching data.</p></div>
+<div class="code-label">internal/worker/notify.go</div>
+<pre><code><span class="kw">func</span> (h *NotifyHandler) <span class="fn">ProcessTask</span>(ctx context.Context, t *asynq.Task) <span class="kw">error</span> {
+	<span class="kw">var</span> p NotifyPayload
+	<span class="kw">if</span> err := json.<span class="fn">Unmarshal</span>(t.<span class="fn">Payload</span>(), &amp;p); err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+
+	cfg, err := h.reg.<span class="fn">Get</span>(ctx, tenancy.<span class="fn">TenantID</span>(p.TenantID))
+	<span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+
+	<span class="cm">// Establish context from the payload — exactly as the middleware</span>
+	<span class="cm">// does from the token. Everything below is now tenant-scoped.</span>
+	ctx = tenancy.<span class="fn">With</span>(ctx, tenancy.Context{
+		TenantID: cfg.ID, Tier: cfg.Tier, Role: <span class="st">"system"</span>,
+	})
+
+	<span class="kw">return</span> h.db.<span class="fn">WithTenant</span>(ctx, <span class="kw">func</span>(tx pgx.Tx) <span class="kw">error</span> {
+		b, err := h.q.<span class="fn">WithTx</span>(tx).<span class="fn">GetBooking</span>(ctx, p.BookingID)  <span class="cm">// RLS scopes it</span>
+		<span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+		<span class="kw">return</span> h.sms.<span class="fn">Send</span>(ctx, b)
+	})
+}</code></pre>
+<p>The sweeper of §7.5 is the deliberate exception: it runs platform-wide with an elevated role and no tenant scope. There are exactly two such jobs in the system — the sweeper and the metering aggregator — and both live in a separate package, are reviewed as security-sensitive, and are covered by tests asserting they touch nothing beyond their remit.</p>

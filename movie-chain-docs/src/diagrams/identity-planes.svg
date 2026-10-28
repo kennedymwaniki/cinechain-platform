@@ -1,0 +1,61 @@
+<svg viewBox="0 0 720 400" role="img">
+<text class="s-cap" x="0" y="11">Three populations — and only one of them carries a tenant in its token</text>
+
+<rect class="b-am" x="0" y="20" width="232" height="168" rx="5"/>
+<text class="s-hd" x="10" y="38">1 · Platform operator</text>
+<text class="s-xs" x="10" y="52">CineChain's own staff — Purity</text>
+<rect class="b-n" x="10" y="60" width="212" height="46" rx="4"/>
+<text class="s-monow" x="18" y="75">"sub": "op_44",</text>
+<text class="s-monow" x="18" y="88">"scope": "platform",</text>
+<text class="s-monow" x="18" y="101">— no tenant_id —</text>
+<text class="s-lb" x="10" y="124">Tenant comes from</text>
+<text class="s-sm" x="10" y="138">nothing. Spans all tenants</text>
+<text class="s-sm" x="10" y="151">by design.</text>
+<rect class="b-rd" x="10" y="158" width="212" height="22" rx="3"/>
+<text class="s-xs" x="16" y="172">Aggregates only — never booking data</text>
+
+<rect class="b-bl" x="244" y="20" width="232" height="168" rx="5"/>
+<text class="s-hd" x="254" y="38">2 · Tenant staff</text>
+<text class="s-xs" x="254" y="52">Brian, Tabitha, Chris — one chain</text>
+<rect class="b-n" x="254" y="60" width="212" height="46" rx="4"/>
+<text class="s-monow" x="262" y="75">"sub": "u_88",</text>
+<text class="s-monow" x="262" y="88">"tenant_id": "nyati",  &#9664;</text>
+<text class="s-monow" x="262" y="101">"role": "box_office"</text>
+<text class="s-lb" x="254" y="124">Tenant comes from</text>
+<text class="s-sm" x="254" y="138">the token. It is an attribute</text>
+<text class="s-sm" x="254" y="151">of the person.</text>
+<rect class="b-gr" x="254" y="158" width="212" height="22" rx="3"/>
+<text class="s-xs" x="260" y="172">Classic multi-tenancy. RLS applies.</text>
+
+<rect class="b-gr" x="488" y="20" width="232" height="168" rx="5"/>
+<text class="s-hd" x="498" y="38">3 · Consumer</text>
+<text class="s-xs" x="498" y="52">Grace — buys from any chain</text>
+<rect class="b-n" x="498" y="60" width="212" height="46" rx="4"/>
+<text class="s-monow" x="506" y="75">"sub": "c_7f21",</text>
+<text class="s-monow" x="506" y="88">"scope": "consumer",</text>
+<text class="s-monow" x="506" y="101">— no tenant_id —</text>
+<text class="s-lb" x="498" y="124">Tenant comes from</text>
+<text class="s-sm" x="498" y="138">the screening she is booking.</text>
+<text class="s-sm" x="498" y="151">An attribute of the purchase.</text>
+<rect class="b-am" x="498" y="158" width="212" height="22" rx="3"/>
+<text class="s-xs" x="504" y="172">Ownership, not tenancy, guards her data</text>
+
+<rect class="b-n" x="0" y="200" width="720" height="52" rx="5"/>
+<text class="s-hdw" x="12" y="218">The rule, stated precisely</text>
+<text class="s-smw" x="12" y="235">Tenant context must come from a source the caller cannot forge. For an actor who belongs to a tenant that is the token; for one who</text>
+<text class="s-smw" x="12" y="248">does not, it is the resource, resolved server-side. Never accept the caller's claim about <tspan font-weight="700">which tenant to act as</tspan>.</text>
+
+<text class="s-cap" x="0" y="274">How the API tells them apart — one check, at the edge</text>
+<rect class="b" x="0" y="282" width="348" height="58"/>
+<text class="s-lb" x="10" y="300">Token HAS tenant_id  &#8594;  staff token</text>
+<text class="s-sm" x="10" y="316">Valid on /theatres, /screenings, /reports.</text>
+<text class="s-sm" x="10" y="331">SET LOCAL app.tenant_id · RLS enforces.</text>
+<rect class="b" x="372" y="282" width="348" height="58"/>
+<text class="s-lb" x="382" y="300">No tenant_id  &#8594;  consumer token</text>
+<text class="s-sm" x="382" y="316">Valid on /screenings/:id/holds, /bookings.</text>
+<text class="s-sm" x="382" y="331">Tenant resolved from the screening; ownership checked.</text>
+<rect class="b-rd" x="0" y="348" width="720" height="50" rx="5"/>
+<text class="s-hd" x="12" y="366">Both directions must be refused</text>
+<text class="s-sm" x="12" y="382">A consumer token on a staff endpoint is privilege escalation. A staff token on a consumer endpoint is subtler and just as bad: it would let</text>
+<text class="s-sm" x="12" y="394">a Nyati clerk act as a customer of Prestige. Neither is a 404 — both are 403, logged and alerted on.</text>
+</svg>

@@ -1,0 +1,66 @@
+<h2><span class="num">10</span>Architecture, Tiering and Deployment</h2>
+
+<h3>10.1 Service decomposition</h3>
+<figure class="fig-wide">{{d:container-arch}}<figcaption><b>Figure 10.1.</b> The runtime architecture. Pooled and siloed databases sit side by side behind the same services; a tenant's tier decides which connection a request gets, never which code runs.</figcaption></figure>
+
+<p>Services<span class="cite">G ch. 7, &ldquo;Designing Multi-Tenant Services&rdquo;, p. 158</span> are separated along failure-domain lines rather than by data entity. The question asked of each boundary was <em>&ldquo;if this fails, what else should keep working?&rdquo;</em></p>
+<table>
+<thead><tr><th style="width:18%">Service</th><th style="width:30%">Owns</th><th>Why it is separate</th></tr></thead>
+<tbody>
+<tr><td><b>Catalogue</b></td><td>Films, screenings, pricing rules</td><td>Read-heavy and highly cacheable. Scales on a different curve from everything else.</td></tr>
+<tr><td><b>Inventory</b></td><td>Seat maps, holds, locks</td><td>The latency-critical hot path. Must be able to scale independently, and must never be starved by reporting.</td></tr>
+<tr><td><b>Booking</b></td><td>Orders, tickets, refunds</td><td>Transactional and correctness-critical. Deployed conservatively.</td></tr>
+<tr><td><b>Payment</b></td><td>Provider integration, webhooks</td><td>Isolated because provider outages are frequent and must not cascade.</td></tr>
+<tr><td><b>Notification</b></td><td>SMS, e-mail, push</td><td>Entirely asynchronous. Its failure must never fail a booking.</td></tr>
+<tr><td><b>Reporting</b></td><td>Aggregates and exports</td><td>Separated chiefly to keep its heavy queries off the booking connection pool.</td></tr>
+<tr><td><b>Control plane</b></td><td>Tenants, onboarding, metering</td><td>Different security posture, different scaling signal, different availability target.</td></tr>
+</tbody></table>
+
+<div class="box note"><span class="bt">A word on starting with a modular monolith</span>
+<p>Nothing in this document requires seven separately deployed services on day one. A single deployable with seven clearly bounded modules — separate schemas of ownership, no cross-module database access, communication through interfaces — will serve the first two hundred tenants comfortably and is substantially easier to operate with a small team.</p>
+<p>What matters is that the <em>boundaries</em> are real from the start, so that extracting Inventory into its own service when it needs independent scaling is a deployment change rather than an archaeology project. Draw the lines early; defer the network calls.</p></div>
+
+<h3>10.2 Tier definitions<span class="cite">G ch. 14, &ldquo;Tiering Patterns&rdquo;, pp. 364&ndash;371</span></h3>
+<figure>{{d:tiering-ladder}}<figcaption><b>Figure 10.2.</b> The four tiers. Every difference between these columns is a configuration value read at runtime.</figcaption></figure>
+
+<table>
+<caption>Enforcement points for each tier attribute</caption>
+<thead><tr><th style="width:24%">Attribute</th><th style="width:30%">Where it is enforced</th><th>Failure behaviour</th></tr></thead>
+<tbody>
+<tr><td>API rate limit</td><td>Ingress, keyed on <code>tenant_id</code> from the token</td><td><code>429</code> with <code>Retry-After</code> and the limit that was hit</td></tr>
+<tr><td>Theatre count</td><td>Application, on create</td><td><code>402</code> with an upgrade path in the message</td></tr>
+<tr><td>Hold window</td><td>Tenant config, read per request</td><td>n/a — a configuration value</td></tr>
+<tr><td>Database placement</td><td>Connection resolver, from <code>tenant.db_ref</code></td><td>Request fails closed if the reference cannot be resolved</td></tr>
+<tr><td>Backup retention</td><td>Infrastructure policy per database</td><td>n/a — operational</td></tr>
+<tr><td>Support response</td><td>Alert routing and ticket priority</td><td>n/a — organisational</td></tr>
+</tbody></table>
+
+<div class="box key"><span class="bt">The constraint that keeps four tiers affordable</span>
+<p>There is no <code>if (tier === 'premium')</code> in business logic anywhere in this system. Tier differences are expressed exclusively as: limits read from tenant configuration, a connection string resolved per request, and infrastructure policy applied outside the application.</p>
+<p>Adding a fifth tier should require a configuration row and a pricing page. If it ever requires a sprint, tier logic has leaked into business logic and should be refactored out before it spreads.</p></div>
+
+<h3>10.3 Cluster topology</h3>
+<figure class="fig-wide">{{d:deployment-topology}}<figcaption><b>Figure 10.3.</b> One cluster, three kinds of namespace. The siloed namespace runs the same container images from the same CI build — a silo is a values file, not a fork.</figcaption></figure>
+
+<h4>Promoting a tenant from pooled to siloed<span class="cite g2">Azure SQL — SaaS tenancy patterns</span></h4>
+<p>This must be a supported operation rather than a project, because it is how the commercial model works. The sequence:</p>
+<ol class="tight">
+<li>Provision the tenant's dedicated database and apply the identical schema migration set.</li>
+<li>Copy their rows with logical replication, filtered by <code>tenant_id</code>, and let it catch up.</li>
+<li>Place the tenant in a brief read-only window — target under 60 seconds, scheduled outside trading hours.</li>
+<li>Verify row counts and checksums per table between source and target.</li>
+<li>Update <code>tenant.db_ref</code>; new requests resolve to the new database from the next connection.</li>
+<li>Lift read-only. Retain the source rows for a defined period, then delete them.</li>
+</ol>
+<p>Steps 4 and 6 are the ones teams skip and later regret. Verification before cutover is what makes the operation reversible; retention after cutover is what makes rollback possible if a problem appears an hour later.</p>
+
+<h3>10.4 Handling the blockbuster peak</h3>
+<p>The defining load event for this system is a single tenant releasing tickets for a major opening. Five mechanisms combine, and none is sufficient alone:</p>
+<ul class="clean">
+<li><b>Per-tenant rate limits at ingress.</b><span class="cite">G ch. 14, &ldquo;Throttling and Tenant Experience&rdquo;, p. 381</span> Nyati may burst well above their steady-state allowance, but not without bound. This is the primary protection for every other tenant.</li>
+<li><b>Autoscaling on the Inventory service first.</b> It absorbs seat-map reads and hold attempts, which is where the load actually lands.</li>
+<li><b>Seat-map reads served from Redis</b>, never from PostgreSQL, during a sale. The database sees writes, not the read storm.</li>
+<li><b>Separate connection pools per service</b>, so that a reporting query cannot exhaust the connections Booking needs.</li>
+<li><b>A documented pre-scale procedure.</b> Major on-sales are known days in advance — the chain schedules them. Scaling up ahead of a known peak is not an admission of failure; it is the cheapest available mitigation.</li>
+</ul>
+<p>If, despite these, one tenant's peaks routinely degrade others, the answer is the bridge model: move that tenant to Premium, give them a dedicated database, and charge for it. That is not a workaround — it is the architecture working as designed.</p>

@@ -1,0 +1,36 @@
+<svg viewBox="0 0 720 330" role="img">
+<rect class="b-am" x="0" y="16" width="720" height="128" rx="6"/>
+<text class="s-cap" x="14" y="34">Control plane — runs the BUSINESS of the service</text>
+<text class="s-sm" x="14" y="48">Shared by all tenants. Knows nothing about movies, seats or bookings.</text>
+<g>
+<rect class="b" x="14" y="58" width="108" height="46"/><text class="s-hd mid-a" x="68" y="78">Onboarding</text><text class="s-xs mid-a" x="68" y="93">Create a tenant</text>
+<rect class="b" x="132" y="58" width="108" height="46"/><text class="s-hd mid-a" x="186" y="78">Identity</text><text class="s-xs mid-a" x="186" y="93">Who + which tenant</text>
+<rect class="b" x="250" y="58" width="108" height="46"/><text class="s-hd mid-a" x="304" y="78">Tenant mgmt</text><text class="s-xs mid-a" x="304" y="93">Config, tier, status</text>
+<rect class="b" x="368" y="58" width="108" height="46"/><text class="s-hd mid-a" x="422" y="78">Metrics</text><text class="s-xs mid-a" x="422" y="93">Usage per tenant</text>
+<rect class="b" x="486" y="58" width="108" height="46"/><text class="s-hd mid-a" x="540" y="78">Billing</text><text class="s-xs mid-a" x="540" y="93">Invoice per tenant</text>
+<rect class="b" x="604" y="58" width="102" height="46"/><text class="s-hd mid-a" x="655" y="78">Admin UI</text><text class="s-xs mid-a" x="655" y="93">Provider console</text>
+</g>
+<rect class="b-w" x="14" y="112" width="692" height="22" rx="4"/>
+<text class="s-sm mid-a" x="360" y="126">There is exactly ONE control plane, however many tenants you have.</text>
+
+<path class="ln-a" d="M240 144 L240 176" marker-end="url(#ah-a)"/>
+<text class="s-xs" x="248" y="163">provisions &amp; configures</text>
+<path class="ln-b" d="M480 176 L480 144" marker-end="url(#ah-b)"/>
+<text class="s-xs end-a" x="472" y="163">reports usage back</text>
+
+<rect class="b-bl" x="0" y="182" width="720" height="148" rx="6"/>
+<text class="s-capb" x="14" y="200">Application plane — runs the PRODUCT your tenants bought</text>
+<text class="s-sm" x="14" y="214">Every request here carries a tenant context. This is where the movies live.</text>
+<g>
+<rect class="b" x="14" y="224" width="130" height="44"/><text class="s-hd mid-a" x="79" y="243">Catalogue</text><text class="s-xs mid-a" x="79" y="257">Films &amp; screenings</text>
+<rect class="b" x="154" y="224" width="130" height="44"/><text class="s-hd mid-a" x="219" y="243">Seat inventory</text><text class="s-xs mid-a" x="219" y="257">Holds &amp; locks</text>
+<rect class="b" x="294" y="224" width="130" height="44"/><text class="s-hd mid-a" x="359" y="243">Booking</text><text class="s-xs mid-a" x="359" y="257">Orders &amp; tickets</text>
+<rect class="b" x="434" y="224" width="130" height="44"/><text class="s-hd mid-a" x="499" y="243">Payments</text><text class="s-xs mid-a" x="499" y="257">Charge &amp; refund</text>
+<rect class="b" x="574" y="224" width="132" height="44"/><text class="s-hd mid-a" x="640" y="243">Notifications</text><text class="s-xs mid-a" x="640" y="257">SMS &amp; e-mail</text>
+</g>
+<rect class="b-w" x="14" y="276" width="692" height="44" rx="4"/>
+<text class="s-lb" x="24" y="292">Tenant data — every row tagged with tenant_id</text>
+<rect class="b-am" x="380" y="282" width="98" height="30" rx="3"/><text class="s-xs mid-a" x="429" y="301">Nyati Cinemas</text>
+<rect class="b-gr" x="486" y="282" width="98" height="30" rx="3"/><text class="s-xs mid-a" x="535" y="301">Prestige Screens</text>
+<rect class="b-pu" x="592" y="282" width="104" height="30" rx="3"/><text class="s-xs mid-a" x="644" y="301">Sarit Filmhouse</text>
+</svg>

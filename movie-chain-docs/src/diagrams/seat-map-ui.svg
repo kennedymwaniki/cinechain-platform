@@ -1,0 +1,64 @@
+<svg viewBox="0 0 720 300" role="img">
+<rect class="b" x="0" y="0" width="470" height="300" rx="6"/>
+<rect class="b-n" x="0" y="0" width="470" height="40" rx="6"/>
+<text class="s-lbw" x="14" y="18">Avengers: Doomsday</text>
+<text class="s-smw" x="14" y="32">Nyati Westlands · Screen 2 (IMAX) · Sat 14 Jun · 20:30</text>
+<rect x="380" y="9" width="78" height="22" rx="11" fill="var(--amber)"/>
+<text class="s-lbw mid-a" x="419" y="24">04:47 left</text>
+<path d="M60 58 Q235 44 410 58" fill="none" stroke="var(--rule)" stroke-width="7" stroke-linecap="round"/>
+<text class="s-capm mid-a" x="235" y="74">SCREEN</text>
+<g>
+<text class="s-xs" x="14" y="98">A</text><text class="s-xs" x="14" y="118">B</text><text class="s-xs" x="14" y="138">C</text><text class="s-xs" x="14" y="158">D</text><text class="s-xs" x="14" y="178">E</text>
+<g fill="var(--wash)" stroke="var(--rule)">
+<rect x="30" y="88" width="20" height="14" rx="3"/><rect x="56" y="88" width="20" height="14" rx="3"/><rect x="82" y="88" width="20" height="14" rx="3"/><rect x="108" y="88" width="20" height="14" rx="3"/><rect x="134" y="88" width="20" height="14" rx="3"/><rect x="160" y="88" width="20" height="14" rx="3"/><rect x="186" y="88" width="20" height="14" rx="3"/><rect x="212" y="88" width="20" height="14" rx="3"/><rect x="238" y="88" width="20" height="14" rx="3"/><rect x="264" y="88" width="20" height="14" rx="3"/><rect x="290" y="88" width="20" height="14" rx="3"/><rect x="316" y="88" width="20" height="14" rx="3"/>
+<rect x="30" y="108" width="20" height="14" rx="3"/><rect x="56" y="108" width="20" height="14" rx="3"/><rect x="108" y="108" width="20" height="14" rx="3"/><rect x="134" y="108" width="20" height="14" rx="3"/><rect x="186" y="108" width="20" height="14" rx="3"/><rect x="212" y="108" width="20" height="14" rx="3"/><rect x="238" y="108" width="20" height="14" rx="3"/><rect x="264" y="108" width="20" height="14" rx="3"/><rect x="290" y="108" width="20" height="14" rx="3"/><rect x="316" y="108" width="20" height="14" rx="3"/>
+<rect x="30" y="128" width="20" height="14" rx="3"/><rect x="56" y="128" width="20" height="14" rx="3"/><rect x="82" y="128" width="20" height="14" rx="3"/><rect x="108" y="128" width="20" height="14" rx="3"/><rect x="134" y="128" width="20" height="14" rx="3"/><rect x="264" y="128" width="20" height="14" rx="3"/><rect x="290" y="128" width="20" height="14" rx="3"/><rect x="316" y="128" width="20" height="14" rx="3"/>
+<rect x="30" y="148" width="20" height="14" rx="3"/><rect x="56" y="148" width="20" height="14" rx="3"/><rect x="82" y="148" width="20" height="14" rx="3"/><rect x="108" y="148" width="20" height="14" rx="3"/><rect x="134" y="148" width="20" height="14" rx="3"/><rect x="160" y="148" width="20" height="14" rx="3"/><rect x="186" y="148" width="20" height="14" rx="3"/><rect x="212" y="148" width="20" height="14" rx="3"/><rect x="238" y="148" width="20" height="14" rx="3"/><rect x="264" y="148" width="20" height="14" rx="3"/><rect x="290" y="148" width="20" height="14" rx="3"/><rect x="316" y="148" width="20" height="14" rx="3"/>
+</g>
+<g fill="var(--rule)" stroke="var(--faint)">
+<rect x="82" y="108" width="20" height="14" rx="3"/><rect x="160" y="108" width="20" height="14" rx="3"/>
+<rect x="160" y="128" width="20" height="14" rx="3"/><rect x="186" y="128" width="20" height="14" rx="3"/><rect x="212" y="128" width="20" height="14" rx="3"/><rect x="238" y="128" width="20" height="14" rx="3"/>
+</g>
+<g fill="var(--amber)" stroke="var(--amber)">
+<rect x="160" y="168" width="20" height="14" rx="3"/><rect x="186" y="168" width="20" height="14" rx="3"/>
+</g>
+<g fill="var(--amber-wash)" stroke="var(--amber-line)">
+<rect x="30" y="168" width="20" height="14" rx="3"/><rect x="56" y="168" width="20" height="14" rx="3"/><rect x="82" y="168" width="20" height="14" rx="3"/><rect x="108" y="168" width="20" height="14" rx="3"/><rect x="134" y="168" width="20" height="14" rx="3"/><rect x="212" y="168" width="20" height="14" rx="3"/><rect x="238" y="168" width="20" height="14" rx="3"/><rect x="264" y="168" width="20" height="14" rx="3"/><rect x="290" y="168" width="20" height="14" rx="3"/><rect x="316" y="168" width="20" height="14" rx="3"/>
+</g>
+<text class="s-xs" x="344" y="178">VIP row</text>
+</g>
+<g>
+<rect x="30" y="200" width="12" height="10" rx="2" fill="var(--wash)" stroke="var(--rule)"/><text class="s-xs" x="48" y="209">Available</text>
+<rect x="110" y="200" width="12" height="10" rx="2" fill="var(--rule)" stroke="var(--faint)"/><text class="s-xs" x="128" y="209">Taken</text>
+<rect x="180" y="200" width="12" height="10" rx="2" fill="var(--amber)"/><text class="s-xs" x="198" y="209">Your selection</text>
+<rect x="286" y="200" width="12" height="10" rx="2" fill="var(--amber-wash)" stroke="var(--amber-line)"/><text class="s-xs" x="304" y="209">VIP (+KSh 400)</text>
+</g>
+<path class="ln-f" d="M14 220 L456 220"/>
+<text class="s-lb" x="14" y="240">2 seats · E6, E7</text>
+<text class="s-sm" x="14" y="256">2 × VIP @ KSh 1 400</text>
+<text class="s-sm" x="14" y="270">Booking fee KSh 100</text>
+<text class="s-hd" x="14" y="290">Total KSh 2 900</text>
+<rect x="300" y="248" width="156" height="34" rx="5" fill="var(--amber)"/>
+<text class="s-lbw mid-a" x="378" y="269">Pay with M-Pesa →</text>
+
+<rect class="b-am" x="486" y="0" width="234" height="126" rx="5"/>
+<text class="s-hd" x="496" y="18">What the timer really means</text>
+<text class="s-sm" x="496" y="36">The countdown is not decoration. It is the</text>
+<text class="s-sm" x="496" y="50">visible face of a Redis TTL. When it reaches</text>
+<text class="s-sm" x="496" y="64">zero the seats genuinely return to sale —</text>
+<text class="s-sm" x="496" y="78">whether or not this browser is still open.</text>
+<text class="s-sm" x="496" y="98">Always render it from the server's</text>
+<text class="s-sm" x="496" y="112"><tspan class="s-mono">expires_at</tspan>, never a client-side counter.</text>
+
+<rect class="b-w" x="486" y="136" width="234" height="164" rx="5"/>
+<text class="s-hd" x="496" y="154">Details that decide whether</text>
+<text class="s-hd" x="496" y="168">people finish the booking</text>
+<text class="s-sm" x="496" y="188">·  Grey out, never hide, taken seats —</text>
+<text class="s-sm" x="496" y="201">   people navigate by shape</text>
+<text class="s-sm" x="496" y="219">·  Refuse to leave a single orphan seat</text>
+<text class="s-sm" x="496" y="232">   between two bookings</text>
+<text class="s-sm" x="496" y="250">·  Warn at 60 seconds, offer one extension</text>
+<text class="s-sm" x="496" y="268">·  Push seat-map changes over WebSocket —</text>
+<text class="s-sm" x="496" y="281">   nothing is worse than clicking a seat</text>
+<text class="s-sm" x="496" y="294">   that was sold 20 seconds ago</text>
+</svg>

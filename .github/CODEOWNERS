@@ -1,0 +1,6 @@
+# The tenancy runtime is security code: every change needs a senior review.
+/movie-chain-api/src/tenancy/**            @senior-reviewer
+/movie-chain-api/src/db/sql/**             @senior-reviewer
+/movie-chain-api/src/db/tenant-tables.ts   @senior-reviewer
+/movie-chain-api/src/db/migrations/**      @senior-reviewer
+/movie-chain-api/test/isolation/**         @senior-reviewer

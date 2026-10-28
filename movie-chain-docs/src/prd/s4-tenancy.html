@@ -1,0 +1,79 @@
+<h2><span class="num">4</span>The Tenancy Model</h2>
+<p class="lede">This section fixes the decisions that everything else in the document depends on. It is the part to challenge hardest in review, because it is the part that cannot be cheaply changed later.</p>
+
+<h3>The tenant is the cinema chain</h3>
+<p>A <b>tenant</b> in CineChain is a cinema chain: Nyati Cinemas, Prestige Screens, Sarit Filmhouse. It is the unit of isolation, billing, administration and support.</p>
+
+<figure>{{d:tenant-hierarchy}}<figcaption><b>Figure 4.1.</b> The CineChain hierarchy, and the distinction at the bottom that the rest of the data model turns on.</figcaption></figure>
+
+<h4>Why not the theatre?</h4>
+<p>Making each theatre a tenant would look tidier and would be wrong. Chris, the chain administrator, needs a consolidated revenue view across all fourteen Nyati theatres — user story A-1. If each theatre were a separate tenant, that story could only be satisfied by deliberately breaching the isolation boundary, and the product would spend its life fighting its own security model.</p>
+<p>Applying the test from the masterclass: <em>the largest group of users who must see each other's data</em> is the chain. The chain is therefore the tenant. It also matches who signs the contract and receives the invoice, so the two tests agree.</p>
+
+<h4>Why not the individual moviegoer?</h4>
+<p>Grace is not a tenant, and — this is the important part — she is not a <em>user within</em> one either. She is a member of the public who buys tickets. Her booking is recorded against Nyati's data because Nyati sold it and their staff must see it at the door, but Grace herself belongs to no chain.</p>
+
+<h3>Three populations of user</h3>
+<p>This system has three kinds of user, and only one of them carries a tenant in its token. Getting this wrong produces a product that fails on first contact with a travelling customer.</p>
+
+<figure class="fig-wide">{{d:identity-planes}}<figcaption><b>Figure 4.2.</b> The three populations, their token shapes, and the single check at the edge that separates them.</figcaption></figure>
+
+<table>
+<thead><tr><th style="width:20%">Population</th><th style="width:18%">Belongs to</th><th style="width:24%">Tenant comes from</th><th>Security question</th></tr></thead>
+<tbody>
+<tr><td><b>Platform operator</b><br>Purity</td><td>No tenant</td><td>Nothing — spans all</td><td>Confined to aggregates, never booking data</td></tr>
+<tr><td><b>Tenant staff</b><br>Brian, Tabitha, Chris</td><td>Exactly one tenant</td><td><b>The token</b> — <code>tenant_id</code> claim</td><td>Which tenant's data may I read? &rarr; RLS</td></tr>
+<tr><td><b>Consumer</b><br>Grace</td><td>No tenant, or many</td><td><b>The resource</b> — <code>screening.tenant_id</code>, resolved server-side</td><td>Is this booking mine? &rarr; ownership</td></tr>
+</tbody></table>
+
+<div class="box key"><span class="bt">The distinction, in one sentence</span>
+<p>For staff, the tenant is an attribute of <b>the actor</b>. For a consumer, it is an attribute of <b>the transaction</b>.</p>
+<p>Brian <em>is</em> a Nyati employee; that fact travels with him into every request. Grace is not a Nyati anything — she bought a seat on Tuesday that happened to be Nyati's, and on Friday she may buy one from Prestige while travelling. Stamping <code>tenant_id: nyati</code> into her token would make that second purchase impossible.</p></div>
+
+<h4>Consumers may transact with several chains</h4>
+<p>Grace holds <b>one CineChain identity</b>. Her token carries her consumer id and no tenant claim. She browses every chain's cinemas, books at any of them, and accrues loyalty independently at each — the Uber-and-Bolt arrangement, where one identity works across many providers.</p>
+<p>This is implemented with two records on opposite sides of the tenant boundary, specified in §6.2: <code>platform.consumer</code> (platform-level, outside tenant RLS) and <code>tenant_customer</code> (per-chain, fully RLS-guarded).</p>
+
+<div class="box note"><span class="bt">Why this does not weaken isolation</span>
+<p>A chain reads <code>tenant_customer</code> and sees only people who transacted with <em>it</em> — RLS guarantees that exactly as for every other tenant table. Nyati knows Grace because she bought from them, not because they can read the platform's customer list. They cannot read it: <code>platform.consumer</code> sits outside the tenant boundary and no tenant-scoped query reaches it.</p>
+<p>So <em>can Nyati tell Grace also uses Prestige?</em> No — there is no path from their row to Prestige's. One corollary for implementers: never expose <code>consumer_id</code> in tenant-facing APIs. It is an internal join key, and a shared opaque identifier handed to two chains is the raw material for exactly the correlation we are preventing.</p></div>
+
+<div class="box plain"><span class="bt">Staff who work for two chains</span>
+<p>They get two accounts, and that is correct rather than a compromise. A clerk's session must be unambiguously one tenant's, because every action they take is attributed to that tenant. Multi-tenant identity is a property of consumers, who transact; not of staff, who act on a tenant's behalf.</p></div>
+
+<h3>Seats versus seats-at-a-screening</h3>
+<p>The single most important modelling decision in this system, and the one most often got wrong:</p>
+<div class="grid2">
+<div class="card"><h5>A seat</h5><p>Physical furniture. Row E, seat 7, in Screen 2 at Nyati Westlands. It exists whether or not a film is showing. It changes only when the auditorium is refitted.</p></div>
+<div class="card on"><h5>A seat at a screening</h5><p>What a customer actually buys. Row E seat 7, <em>for the 20:30 showing of Avengers: Doomsday on 14 June</em>. This is the thing that is held, sold and refunded.</p></div>
+</div>
+<p>Conflating these produces a system that cannot sell the same seat for two different showings on the same day — which is, of course, the entire business. The <code>seat_lock</code> table in Section 6 exists precisely to represent the second concept.</p>
+
+<h3>Roles and the two planes<span class="cite">G ch. 2, &ldquo;Tenant, Tenant Admin, and System Admin Users&rdquo;, p. 41</span></h3>
+<table>
+<thead><tr><th style="width:18%">Role</th><th style="width:14%">Plane</th><th style="width:22%">Scope</th><th>May do</th></tr></thead>
+<tbody>
+<tr><td><code>guest</code><br><span class="s-sm">no account</span></td><td>Application</td><td>One hold, one booking</td><td>Browse, hold a seat, pay, receive a ticket. Authenticated only by possession of a signed hold token, then a signed ticket code</td></tr>
+<tr><td><code>consumer</code><br><span class="s-sm">platform-level</span></td><td>Application</td><td>Own bookings, <b>any tenant</b></td><td>Everything a guest may do, plus booking history across chains and per-chain loyalty. <b>Carries no <code>tenant_id</code></b></td></tr>
+<tr><td><code>box_office</code></td><td>Application</td><td>One theatre</td><td>Sell walk-ins, scan tickets, process cash refunds</td></tr>
+<tr><td><code>theatre_manager</code></td><td>Application</td><td>One or more theatres</td><td>Schedule screenings, manage screens and seats, view theatre reports</td></tr>
+<tr><td><code>chain_admin</code></td><td>Application</td><td>Whole tenant</td><td>Everything within the tenant: pricing, staff, all theatres, exports</td></tr>
+<tr><td class="s-sm"><i>separate system</i></td><td></td><td></td><td></td></tr>
+<tr><td><code>platform_operator</code></td><td><b>Control</b></td><td>All tenants</td><td>Onboard, suspend, re-tier, meter, offboard — and <b>no</b> access to booking or customer data</td></tr>
+</tbody></table>
+
+<div class="box warn"><span class="bt">A hard constraint on the operator role</span>
+<p>Purity can see that Nyati made 41 000 bookings last month. She cannot see who booked, what they paid, or which seats they sat in. Operator tooling reads aggregated metering data, not tenant application data.</p>
+<p>This is a deliberate design constraint, not merely a policy statement: the control plane connects with credentials that do not reach application tables at all. When operators need to investigate a specific tenant problem, that access is granted temporarily, is time-boxed, requires the tenant's consent, and is logged where the tenant can see it.</p></div>
+
+<h3>Deployment model per tier</h3>
+<p>Following the per-resource decision procedure from the masterclass<span class="cite">G ch. 3, &ldquo;Picking a Deployment Model&rdquo;, p. 50</span><span class="cite g2">MS — Tenancy models</span>, and revisited in Section 10:</p>
+<table>
+<thead><tr><th style="width:16%">Tier</th><th style="width:16%">Compute</th><th style="width:20%">Database</th><th style="width:16%">Redis</th><th>Reasoning</th></tr></thead>
+<tbody>
+<tr><td><b>Basic</b></td><td>Pooled</td><td>Pooled + RLS</td><td>Pooled, prefixed</td><td>Cost efficiency dominates; small tenants pose no load risk</td></tr>
+<tr><td><b>Standard</b></td><td>Pooled</td><td>Pooled + RLS</td><td>Pooled, prefixed</td><td>As above, with higher limits</td></tr>
+<tr><td><b>Premium</b></td><td>Pooled</td><td><b>Siloed</b> database</td><td>Pooled, prefixed</td><td>Bridge model: data volume and backup requirements justify separation; compute does not</td></tr>
+<tr><td><b>Dedicated</b></td><td><b>Siloed</b> namespace</td><td><b>Siloed</b> database</td><td><b>Siloed</b></td><td>Contractual isolation; priced accordingly</td></tr>
+</tbody></table>
+<p>The application code is identical in all four cases. The tenant's tier determines which connection string the request is served with, resolved once per request from the tenant configuration registry. There is no tier branching in business logic anywhere in the system, and that constraint is enforced in code review.</p>

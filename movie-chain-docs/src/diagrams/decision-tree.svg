@@ -1,0 +1,30 @@
+<svg viewBox="0 0 720 320" role="img">
+<text class="s-cap" x="0" y="11">Choosing a model for any one resource — walk it per layer, not once for the whole system</text>
+<rect class="b-n" x="250" y="22" width="220" height="30" rx="5"/>
+<text class="s-lbw mid-a" x="360" y="42">Start: a new resource (table, queue, cache)</text>
+<path class="ln" d="M360 52 L360 70" marker-end="url(#ah)"/>
+<rect class="b-am" x="230" y="70" width="260" height="32" rx="5"/>
+<text class="s-lb mid-a" x="360" y="83">Does a contract, law or regulator</text>
+<text class="s-lb mid-a" x="360" y="96">demand physical separation?</text>
+<path class="ln-r" d="M490 86 L600 86" marker-end="url(#ah-r)"/><text class="s-xs" x="524" y="80">YES</text>
+<rect class="b-rd" x="600" y="70" width="120" height="32" rx="5"/><text class="s-lb mid-a" x="660" y="90">SILO it</text>
+<path class="ln" d="M360 102 L360 120" marker-end="url(#ah)"/><text class="s-xs" x="368" y="115">no</text>
+<rect class="b-am" x="230" y="120" width="260" height="32" rx="5"/>
+<text class="s-lb mid-a" x="360" y="133">Would one tenant's peak load</text>
+<text class="s-lb mid-a" x="360" y="146">visibly hurt the others?</text>
+<path class="ln-a" d="M490 136 L600 136" marker-end="url(#ah-a)"/><text class="s-xs" x="524" y="130">YES</text>
+<rect class="b-am" x="600" y="120" width="120" height="32" rx="5"/><text class="s-lb mid-a" x="660" y="134">Pool + throttle</text><text class="s-xs mid-a" x="660" y="146">silo only the outlier</text>
+<path class="ln" d="M360 152 L360 170" marker-end="url(#ah)"/><text class="s-xs" x="368" y="165">no</text>
+<rect class="b-am" x="230" y="170" width="260" height="32" rx="5"/>
+<text class="s-lb mid-a" x="360" y="183">Does one tenant hold so much data</text>
+<text class="s-lb mid-a" x="360" y="196">that shared indexes suffer?</text>
+<path class="ln-a" d="M490 186 L600 186" marker-end="url(#ah-a)"/><text class="s-xs" x="524" y="180">YES</text>
+<rect class="b-am" x="600" y="170" width="120" height="32" rx="5"/><text class="s-lb mid-a" x="660" y="184">Shard or silo</text><text class="s-xs mid-a" x="660" y="196">that tenant only</text>
+<path class="ln-g" d="M360 202 L360 222" marker-end="url(#ah-g)"/><text class="s-xs" x="368" y="217">no</text>
+<rect class="b-gr" x="230" y="222" width="260" height="38" rx="5"/>
+<text class="s-hd mid-a" x="360" y="240">POOL it — with RLS</text>
+<text class="s-xs mid-a" x="360" y="254">This is where the large majority of resources land</text>
+<rect class="b-w" x="0" y="274" width="720" height="44" rx="5"/>
+<text class="s-lb" x="14" y="292">Notice what is <b>not</b> on this tree: &quot;how big is the customer&quot; and &quot;what did the salesperson promise&quot;.</text>
+<text class="s-sm" x="14" y="309">Size is a proxy for the real questions — load, data volume, obligation. Ask the real question and the answer survives contact with growth.</text>
+</svg>

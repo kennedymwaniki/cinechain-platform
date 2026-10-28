@@ -1,0 +1,42 @@
+<svg viewBox="0 0 720 486" role="img">
+<g>
+<rect class="b-n" x="0" y="0" width="112" height="26" rx="4"/><text class="s-lbw mid-a" x="56" y="17">Customer</text>
+<rect class="b-n" x="132" y="0" width="112" height="26" rx="4"/><text class="s-lbw mid-a" x="188" y="17">Booking API</text>
+<rect class="b-n" x="264" y="0" width="128" height="26" rx="4"/><text class="s-lbw mid-a" x="328" y="17">Redis (locks)</text>
+<rect class="b-n" x="412" y="0" width="128" height="26" rx="4"/><text class="s-lbw mid-a" x="476" y="17">PostgreSQL</text>
+<rect class="b-n" x="560" y="0" width="160" height="26" rx="4"/><text class="s-lbw mid-a" x="640" y="17">Payment provider</text>
+<path class="lifeline" d="M56 26 L56 440 M188 26 L188 440 M328 26 L328 440 M476 26 L476 440 M640 26 L640 440"/>
+</g>
+<rect class="b-am" x="0" y="34" width="170" height="16" rx="3"/><text class="s-xs" x="6" y="46">T+0s — customer taps seat B7</text>
+<path class="ln" d="M56 62 L184 62" marker-end="url(#ah)"/><text class="s-sm" x="62" y="58">POST /screenings/88/holds  {seats:[B7]}</text>
+<path class="ln-a" d="M188 82 L324 82" marker-end="url(#ah-a)"/><text class="s-sm" x="194" y="78">SET lock:t_nyati:scr88:B7 NX EX 300</text>
+<path class="ln-g" d="M328 100 L192 100" marker-end="url(#ah-g)"/><text class="s-sm" x="200" y="96">OK — nobody else had it</text>
+<text class="s-xs" x="336" y="96">NX = only if absent. This is the atomic step.</text>
+<path class="ln" d="M188 120 L472 120" marker-end="url(#ah)"/><text class="s-sm" x="194" y="116">INSERT seat_lock (status=HELD, expires_at=now()+5min)</text>
+<path class="ln" d="M476 138 L192 138" marker-end="url(#ah)"/><text class="s-sm" x="200" y="134">hold_id = h_7f21</text>
+<path class="ln" d="M184 156 L60 156" marker-end="url(#ah)"/><text class="s-sm" x="66" y="152">201 { hold_id, expires_at, 300s }</text>
+<rect class="b-bl" x="0" y="166" width="720" height="20" rx="3"/>
+<text class="s-sm" x="8" y="180">Seat B7 now shows as unavailable to every other customer of THIS tenant. Other tenants never saw it at all — different key prefix.</text>
+
+<rect class="b-am" x="0" y="196" width="230" height="16" rx="3"/><text class="s-xs" x="6" y="208">T+0…300s — the five-minute window</text>
+<path class="ln" d="M56 226 L184 226" marker-end="url(#ah)"/><text class="s-sm" x="62" y="222">POST /bookings { hold_id, payment_method }</text>
+<path class="ln-a" d="M188 246 L324 246" marker-end="url(#ah-a)"/><text class="s-sm" x="194" y="242">GET lock — still mine? still alive?</text>
+<path class="ln" d="M188 266 L636 266" marker-end="url(#ah)"/><text class="s-sm" x="194" y="262">Charge KSh 1 400 (idempotency-key = hold_id)</text>
+<path class="ln-g" d="M640 286 L192 286" marker-end="url(#ah-g)"/><text class="s-sm" x="200" y="282">captured · txn_9931</text>
+<path class="ln-g" d="M188 306 L472 306" marker-end="url(#ah-g)"/><text class="s-sm" x="194" y="302">TX: seat_lock → SOLD, INSERT booking + tickets</text>
+<path class="ln-a" d="M188 326 L324 326" marker-end="url(#ah-a)"/><text class="s-sm" x="194" y="322">DEL lock key — Postgres is now the record</text>
+<path class="ln-g" d="M184 346 L60 346" marker-end="url(#ah-g)"/><text class="s-sm" x="66" y="342">201 Booking confirmed · QR ticket</text>
+
+<rect class="b-rd" x="0" y="360" width="230" height="16" rx="3"/><text class="s-xs" x="6" y="372">Alternative — customer walks away</text>
+<path class="ln-r" d="M328 396 L328 386" marker-end="url(#ah-r)"/>
+<rect class="b-rd" x="238" y="386" width="270" height="34" rx="4"/>
+<text class="s-sm" x="246" y="400">T+300s · Redis key expires by itself</text>
+<text class="s-xs" x="246" y="413">No timer, no cron, no code. The TTL is the mechanism.</text>
+<rect class="b-w" x="516" y="386" width="204" height="34" rx="4"/>
+<text class="s-xs" x="524" y="400">A sweeper marks the stale HELD row</text>
+<text class="s-xs" x="524" y="413">EXPIRED so reporting stays honest.</text>
+<rect class="b-gr" x="0" y="430" width="720" height="50" rx="4"/>
+<text class="s-hd" x="8" y="446">Why Redis holds the lock and Postgres holds the truth</text>
+<text class="s-sm" x="8" y="461">Redis gives you expiry for free and absorbs the seat-map polling. Postgres gives you durability and a unique</text>
+<text class="s-sm" x="8" y="474">constraint that cannot lie. Use each for what it is actually good at.</text>
+</svg>

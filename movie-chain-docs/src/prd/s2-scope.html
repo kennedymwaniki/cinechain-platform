@@ -1,0 +1,52 @@
+<h2><span class="num">2</span>Problem, Goals and Scope</h2>
+
+<h3>The problem</h3>
+<p>A cinema chain operating across several towns faces a set of problems that compound with every additional site.</p>
+<dl>
+<dt>Inventory is fragmented</dt>
+<dd>Each theatre knows its own seats. Nobody has a live picture of the estate, so a chain cannot tell which screenings are underselling while there is still time to act.</dd>
+<dt>Scheduling is manual and error-prone</dt>
+<dd>A blockbuster shows four times a day in one town and twice in another, and the schedule is built in a spreadsheet. Double-booking a screen is a regular occurrence and is discovered by an audience.</dd>
+<dt>Online selling is bolted on</dt>
+<dd>Where online sales exist, they usually run against a separate inventory from the box office, which produces the worst possible failure: a seat sold twice, discovered at the door.</dd>
+<dt>There is no reliable seat-hold mechanism</dt>
+<dd>Customers abandon a booking half-way and the seat stays blocked, or the seat is never blocked at all and two customers pay for it.</dd>
+</dl>
+
+<h3>Goals</h3>
+<ol>
+<li><b>One live seat inventory</b> shared by the website, the mobile app and the box-office terminal, with a guarantee that a seat can be sold exactly once.</li>
+<li><b>A five-minute hold</b> that gives a customer time to pay without allowing abandoned baskets to starve inventory.</li>
+<li><b>Chain-wide visibility</b> — occupancy, revenue and performance across every theatre in one view.</li>
+<li><b>Self-service onboarding</b> so that the platform's growth is not limited by engineering time.</li>
+<li><b>Verifiable tenant isolation</b>, enforced by the database rather than by developer discipline.</li>
+<li><b>Four commercial tiers</b> served by one codebase, differing only in configuration.</li>
+</ol>
+
+<h3>Non-goals for version 1</h3>
+<p>Stating these explicitly prevents the scope creep that kills first releases.</p>
+<ul class="clean">
+<li><b>Food and beverage sales</b> — a substantial product in its own right, deferred.</li>
+<li><b>Loyalty and membership schemes</b> — planned for a later increment; the data model leaves room.</li>
+<li><b>Dynamic and surge pricing</b> — v1 supports fixed pricing per seat class and per screening.</li>
+<li><b>Distributor settlement and film-hire reporting</b> — exports are provided; reconciliation is not.</li>
+<li><b>Native mobile applications</b> — a responsive web app first.</li>
+<li><b>Multi-currency</b> — KES only in v1, though amounts are stored with an explicit currency from the start.</li>
+<li><b>Unreserved (free) seating</b> — every screening in v1 is allocated seating.</li>
+</ul>
+
+<div class="box note"><span class="bt">A deliberate exception</span>
+<p>Multi-currency is a non-goal but the schema carries a currency column from day one, and money is stored in minor units as integers. Retrofitting currency into a money model is disproportionately painful relative to carrying the column from the start. This is the one place where we pay a small cost now against a likely future requirement — and it is worth naming the reasoning, because doing this everywhere is how a v1 never ships.</p></div>
+
+<h3>Success metrics</h3>
+<table>
+<thead><tr><th style="width:18%">Category</th><th style="width:36%">Metric</th><th style="width:16%">Target</th><th>Why this one</th></tr></thead>
+<tbody>
+<tr><td rowspan="2"><b>Product</b></td><td>Seat-selection to payment conversion</td><td class="c">&ge; 75%</td><td>The hold window is the main thing that moves this</td></tr>
+<tr><td>Bookings abandoned after hold expiry</td><td class="c">&le; 12%</td><td>Higher means five minutes is too short, or payment is too slow</td></tr>
+<tr><td rowspan="2"><b>Technical</b></td><td>p95 seat-map read</td><td class="c">&le; 200 ms</td><td>Below this the map feels live; above it, people mis-click</td></tr>
+<tr><td>p99 hold acquisition</td><td class="c">&le; 400 ms</td><td>This is the interaction customers judge the product by</td></tr>
+<tr><td rowspan="2"><b>Tenancy</b></td><td>Cross-tenant access incidents</td><td class="c">0</td><td>Non-negotiable</td></tr>
+<tr><td>Automated onboarding success rate</td><td class="c">&ge; 99%</td><td>Failures here consume engineering time directly</td></tr>
+<tr><td><b>Commercial</b></td><td>Infrastructure cost per pooled tenant</td><td class="c">Measured monthly</td><td>Unmeasured cost makes every pricing decision a guess</td></tr>
+</tbody></table>

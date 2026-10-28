@@ -1,0 +1,38 @@
+<section class="toc">
+<h2 class="cont">Contents</h2>
+<p class="lede">Sections 1–4 define <b>what</b> we are building and for whom. Sections 5–10 define <b>how</b>, in technology-neutral terms. Sections 11–14 are the implementation guide for this edition's stack. Sections 15–18 cover delivery.</p>
+<ol>
+  <li>Executive Summary
+    <ul><li>The product in one page</li><li>Why multi-tenant</li><li>What success looks like</li></ul></li>
+  <li>Problem, Goals and Scope
+    <ul><li>The problem we are solving</li><li>Goals and non-goals</li><li>Success metrics</li></ul></li>
+  <li>Users and Their Jobs
+    <ul><li>Five personas</li><li>User stories by persona</li><li>The journeys that matter</li></ul></li>
+  <li>The Tenancy Model
+    <ul><li>What a tenant is here</li><li>The hierarchy</li><li><b>Three populations of user</b></li><li>Roles and the control plane</li></ul></li>
+  <li>Functional Requirements
+    <ul><li><b>Customer identity — guest first</b></li><li>Tenant and user management</li><li>Venue configuration</li><li>Catalogue and scheduling</li><li>Discovery and browsing</li><li>Seat selection and holds</li><li>Payment and ticketing</li><li>Admission and check-in</li><li>Refunds and cancellations</li><li>Reporting</li></ul></li>
+  <li>Domain and Data Design
+    <ul><li>Entity model</li><li><b>Identity — staff vs consumers</b></li><li>Schema with tenancy</li><li>Isolation policy</li><li>Indexing strategy</li></ul></li>
+  <li>The Seat-Hold Engine
+    <ul><li>Requirements</li><li>The race condition</li><li>Design and sequence</li><li>Failure modes</li><li>Edge cases in full</li></ul></li>
+  <li>API Design
+    <ul><li>Conventions</li><li>Endpoint catalogue</li><li>Errors and idempotency</li></ul></li>
+  <li>Non-Functional Requirements
+    <ul><li>Performance and scale</li><li>Availability</li><li>Security and compliance</li></ul></li>
+  <li>Architecture, Tiering and Deployment
+    <ul><li>Service decomposition</li><li>Tier definitions</li><li>Cluster topology</li></ul></li>
+  <li>Technology Stack
+    <ul><li>Choices and rationale</li><li>Complete component list</li></ul></li>
+  <li>Implementation Guide
+    <ul><li>Project structure</li><li>Tenant context</li><li>The consumer path</li><li>Data access and isolation</li><li>The hold service</li><li>Background workers</li></ul></li>
+  <li>Testing Strategy
+    <ul><li>The isolation test suite</li><li>Concurrency testing</li><li>Load profile</li></ul></li>
+  <li>Observability and Operations
+    <ul><li>Tenant-aware signals</li><li>Runbooks</li></ul></li>
+  <li>Delivery Plan
+    <ul><li>Five increments</li><li>Definition of done</li></ul></li>
+  <li>Risks and Open Questions
+    <ul><li>Risk register</li><li>Decisions still needed</li></ul></li>
+</ol>
+</section>

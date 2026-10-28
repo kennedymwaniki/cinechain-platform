@@ -1,0 +1,52 @@
+<h2><span class="num">11</span>Technology Stack — Go Edition</h2>
+<p class="lede">Go is a strong fit for this system specifically because the hot path is a high-concurrency, low-latency seat-lock service. Where that matters, it is said; where the choice is neutral, that is said too.</p>
+
+<h3>11.1 Core choices</h3>
+<table class="lg">
+<thead><tr><th style="width:20%">Concern</th><th style="width:24%">Choice</th><th>Why this, and what we considered</th></tr></thead>
+<tbody>
+<tr><td><b>Language</b></td><td>Go 1.23+</td><td>Goroutines make the seat-release stampede — thousands of connections waiting on a screening — cheap in a way threaded runtimes are not. Predictable latency matters more here than raw throughput.</td></tr>
+<tr><td><b>HTTP</b></td><td>Gin</td><td>Mature middleware chain, which is where tenant context attaches. <code>chi</code> or plain <code>net/http</code> would work identically; Gin is chosen for binding and validation ergonomics.</td></tr>
+<tr><td><b>Database</b></td><td>PostgreSQL 17 via <code>pgx/v5</code></td><td>Same RLS reasoning as the other edition. <code>pgx</code> rather than <code>database/sql</code> for native types, better performance, and explicit control over connection acquisition — which matters because <code>SET LOCAL</code> must run on the same connection as the query.</td></tr>
+<tr><td><b>Query layer</b></td><td><code>sqlc</code></td><td>Generates type-safe Go from plain SQL. The decisive advantage for this system: <b>the tenant scoping is visible in reviewable SQL files</b> rather than hidden behind a query builder. Auditing isolation means reading the SQL.</td></tr>
+<tr><td><b>Migrations</b></td><td><code>golang-migrate</code></td><td>Plain SQL up/down files; RLS policies live alongside them.</td></tr>
+<tr><td><b>Cache &amp; locks</b></td><td>Redis 7 (<code>go-redis/v9</code>)</td><td>Same design as §7.3. <code>redis.NewScript</code> handles Lua loading and <code>EVALSHA</code> caching.</td></tr>
+<tr><td><b>Jobs</b></td><td><code>asynq</code></td><td>Redis-backed, so no extra infrastructure. Supports per-queue weighting, which gives fair processing across tenants.</td></tr>
+<tr><td><b>Auth</b></td><td>Keycloak + <code>go-jose</code></td><td>JWKS verification with key caching. Never trust an unverified claim.</td></tr>
+<tr><td><b>Real-time</b></td><td><code>nhooyr.io/websocket</code> + Redis pub/sub</td><td>Seat-map push. Go's concurrency model makes many idle websocket connections genuinely cheap.</td></tr>
+<tr><td><b>Validation</b></td><td><code>go-playground/validator</code></td><td>Struct tags, integrated with Gin binding.</td></tr>
+<tr><td><b>Logging</b></td><td><code>zerolog</code></td><td>Zero-allocation structured JSON; a context-derived logger carries tenant labels automatically.</td></tr>
+<tr><td><b>Tracing</b></td><td>OpenTelemetry → Tempo</td><td>Tenant as a root-span attribute; <code>otelpgx</code> and <code>otelgin</code> instrument the edges.</td></tr>
+<tr><td><b>Metrics</b></td><td><code>prometheus/client_golang</code></td><td>Tenant as a label, long tail bucketed.</td></tr>
+<tr><td><b>Testing</b></td><td><code>testify</code> + <code>testcontainers-go</code> + k6</td><td>A real PostgreSQL with real RLS. Isolation cannot be tested against a mock.</td></tr>
+<tr><td><b>Web client</b></td><td>Next.js 15 (separate)</td><td>The API is JSON-only; the front end is a separate deployable regardless of backend language.</td></tr>
+<tr><td><b>Deployment</b></td><td>Distroless images → Kubernetes, Helm</td><td>~20 MB images and fast cold starts make per-tenant siloed namespaces materially cheaper than on the JVM or Node.</td></tr>
+</tbody></table>
+
+<div class="box note"><span class="bt">What Go gives you here, and what it asks in return</span>
+<p><b>Gives:</b> <code>context.Context</code> is already threaded through every idiomatic function signature, including <code>pgx</code>'s query methods. Tenant context is therefore not an ambient trick bolted onto the language — it uses the mechanism the language already has, and it is visible in every signature.</p>
+<p><b>Asks:</b> there is no framework to save you. Nothing prevents a developer writing a raw query with no tenant scope. You must build the guard rails yourself — a repository layer that derives the tenant from <code>ctx</code>, plus RLS underneath — and enforce them in review. Go trades magic for explicitness, and that trade is only good if you actually write the explicit parts.</p></div>
+
+<h3>11.2 Project structure</h3>
+<pre class="lite"><code>cinechain/
+├─ cmd/
+│  ├─ api/main.go             # application plane
+│  ├─ controlplane/main.go    # SEPARATE binary, separate credentials
+│  └─ worker/main.go          # asynq workers + sweeper
+├─ internal/
+│  ├─ tenancy/                # ◀ the security core — review every change
+│  │  ├─ context.go           # ctx keys, FromContext
+│  │  ├─ middleware.go        # extracts claim, validates tenant
+│  │  ├─ db.go                # pooled vs siloed resolution, SET LOCAL
+│  │  └─ registry.go          # tenant config cache
+│  ├─ catalogue/
+│  ├─ inventory/              # seat maps, holds  ◀ the hot path
+│  ├─ booking/
+│  ├─ payment/
+│  └─ platform/               # logging, metrics, tracing
+├─ db/
+│  ├─ migrations/             # golang-migrate, incl. RLS policies
+│  └─ queries/                # sqlc source — auditable SQL
+└─ deploy/helm/</code></pre>
+<div class="box key"><span class="bt">Why <code>internal/</code> matters more than usual here</span>
+<p>Go's <code>internal/</code> directory is enforced by the compiler: nothing outside this module can import it. Putting <code>tenancy/</code> there means no future service, test helper or tool can reach around the tenant-scoping layer, even accidentally. Combine it with a CODEOWNERS rule on that path and you have a boundary the toolchain defends rather than a convention people remember.</p></div>

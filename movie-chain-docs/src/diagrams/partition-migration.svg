@@ -1,0 +1,46 @@
+<svg viewBox="0 0 720 250" role="img">
+<text class="s-cap" x="0" y="11">Moving between models — and what each move actually costs you</text>
+<rect class="b-am" x="14" y="26" width="180" height="52" rx="5"/>
+<text class="s-hd mid-a" x="104" y="46">A · Shared table</text><text class="s-xs mid-a" x="104" y="60">tenant_id + RLS</text><text class="s-xs mid-a" x="104" y="72">where you start</text>
+<rect class="b-bl" x="270" y="26" width="180" height="52" rx="5"/>
+<text class="s-hd mid-a" x="360" y="46">B · Schema per tenant</text><text class="s-xs mid-a" x="360" y="60">one database</text><text class="s-xs mid-a" x="360" y="72">the middle stop</text>
+<rect class="b-gr" x="526" y="26" width="180" height="52" rx="5"/>
+<text class="s-hd mid-a" x="616" y="46">C · Database per tenant</text><text class="s-xs mid-a" x="616" y="60">full silo</text><text class="s-xs mid-a" x="616" y="72">earned, not assumed</text>
+
+<path class="ln-a" d="M194 44 L266 44" marker-end="url(#ah-a)"/>
+<text class="s-xs mid-a" x="230" y="38">moderate</text>
+<path class="ln-g" d="M194 62 L520 62" marker-end="url(#ah-g)"/>
+<text class="s-xs mid-a" x="357" y="90">A → C directly: copy one tenant's rows, repoint the connection string. This is the move we design for.</text>
+<path class="ln-r" d="M520 100 L198 100" marker-end="url(#ah-r)"/>
+<text class="s-xs mid-a" x="360" y="114">C → A (consolidating back): must re-stamp every row with tenant_id and re-check every uniqueness constraint. Painful.</text>
+
+<rect class="b-w" x="0" y="128" width="234" height="112" rx="5"/>
+<text class="s-lb" x="10" y="146">A → C · the designed path</text>
+<text class="s-xs" x="10" y="164">1  provision the database</text>
+<text class="s-xs" x="10" y="177">2  apply the identical migrations</text>
+<text class="s-xs" x="10" y="190">3  copy rows WHERE tenant_id = …</text>
+<text class="s-xs" x="10" y="203">4  verify counts and checksums</text>
+<text class="s-xs" x="10" y="216">5  update tenant.db_ref</text>
+<rect class="b-gr" x="10" y="222" width="214" height="14" rx="3"/>
+<text class="s-xs" x="16" y="232">No code change. Minutes of read-only.</text>
+
+<rect class="b-w" x="243" y="128" width="234" height="112" rx="5"/>
+<text class="s-lb" x="253" y="146">Why B is a poor destination</text>
+<text class="s-xs" x="253" y="164">Migrations still run once per schema,</text>
+<text class="s-xs" x="253" y="177">so operational cost grows with tenants</text>
+<text class="s-xs" x="253" y="190">exactly as it does in C — but you keep</text>
+<text class="s-xs" x="253" y="203">the shared blast radius of A.</text>
+<rect class="b-rd" x="253" y="210" width="214" height="26" rx="3"/>
+<text class="s-xs" x="259" y="221">Most of C's cost, only some of its</text>
+<text class="s-xs" x="259" y="232">benefit. Choose it for a reason, not by default.</text>
+
+<rect class="b-w" x="486" y="128" width="234" height="112" rx="5"/>
+<text class="s-lb" x="496" y="146">The property to protect</text>
+<text class="s-xs" x="496" y="164">Identical schema in every model.</text>
+<text class="s-xs" x="496" y="177">Identical application code.</text>
+<text class="s-xs" x="496" y="190">Only the connection differs.</text>
+<rect class="b-am" x="496" y="198" width="214" height="38" rx="3"/>
+<text class="s-xs" x="502" y="210">The day A → C requires a code change,</text>
+<text class="s-xs" x="502" y="221">your commercial tiers are welded to your</text>
+<text class="s-xs" x="502" y="232">architecture and neither can move.</text>
+</svg>

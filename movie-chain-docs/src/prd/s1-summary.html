@@ -1,0 +1,33 @@
+<h2><span class="num">1</span>Executive Summary</h2>
+<p class="lede">CineChain is a multi-tenant SaaS platform that lets any cinema chain run its entire ticketing operation — venues, schedules, seat inventory, payments and admission — from one shared system, without ever seeing another chain's data.</p>
+
+<h3>The product in one page</h3>
+<p>Today, a cinema chain in this market has three options: an expensive per-site licensed system, a bespoke build, or a spreadsheet and a card machine. All three scale badly, and none give a chain executive a live view across their estate.</p>
+<p>CineChain is sold as a subscription. A chain signs up, is onboarded in under a minute, and immediately begins configuring theatres, screens and seat layouts. They publish showtimes, sell tickets through a customer-facing web application, take payment by card or M-Pesa, and admit audiences by scanning a QR code. Their staff work in a console scoped to their chain; the platform operator works in a separate console that spans all chains.</p>
+
+<div class="grid3">
+<div class="card"><div class="stat">3</div><div class="stat-l">Tenant-facing surfaces</div><p class="s-sm">Customer booking app, staff console, chain admin console.</p></div>
+<div class="card on"><div class="stat">&lt; 60s</div><div class="stat-l">To onboard a chain</div><p class="s-sm">Fully automated, no engineer involved.</p></div>
+<div class="card"><div class="stat">5 min</div><div class="stat-l">Seat hold window</div><p class="s-sm">The concurrency guarantee at the heart of the system.</p></div>
+</div>
+
+<h3>Why this is built multi-tenant</h3>
+<p>The commercial case is the one set out in the companion masterclass: with separate installations, serving twice as many chains costs roughly twice as much. With multi-tenancy the marginal cost of a new chain approaches zero, which is what makes a subscription business viable at this price point.</p>
+<p>The product case is less obvious and equally important. Because every chain runs the same version, a feature built for one is available to all, and a security fix reaches every customer the same afternoon. In a market where a single cinema chain would never fund the development of, say, dynamic pricing on its own, shared development is what makes the product good.</p>
+
+<div class="box key"><span class="bt">The architectural commitment this document makes</span>
+<p>Tenancy is present from the first migration, not retrofitted. Every tenant-scoped table carries <code>tenant_id</code>; every such table has row-level security<span class="cite g2">PostgreSQL — Row Security Policies</span> enabled; and the application connects as a role that cannot bypass it. A tenant's tier determines <em>which database connection</em> their requests receive — never <em>which code</em> runs.</p>
+<p>This is a deliberate, front-loaded cost of roughly a week at the start of the project, taken in exchange for avoiding a re-platforming exercise later.</p></div>
+
+<h3>What success looks like</h3>
+<table>
+<thead><tr><th style="width:40%">Outcome</th><th style="width:24%">Measure</th><th>Target at 12 months</th></tr></thead>
+<tbody>
+<tr><td>Chains can self-serve entirely</td><td>Onboardings needing engineer involvement</td><td class="c">0</td></tr>
+<tr><td>Customers complete bookings</td><td>Seat-selection → paid conversion</td><td class="c">&ge; 75%</td></tr>
+<tr><td>Seat map feels live</td><td>p95 seat-map read latency</td><td class="c">&le; 200 ms</td></tr>
+<tr><td>No double bookings, ever</td><td>Confirmed double-sold seats</td><td class="c">0</td></tr>
+<tr><td>No cross-tenant exposure</td><td>Cross-tenant data incidents</td><td class="c">0</td></tr>
+<tr><td>The economics hold</td><td>Infrastructure cost per pooled tenant per month</td><td class="c">Known, and &lt; 8% of subscription</td></tr>
+<tr><td>Peaks are survivable</td><td>Booking success rate during a blockbuster on-sale</td><td class="c">&ge; 99.5%</td></tr>
+</tbody></table>

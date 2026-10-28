@@ -1,0 +1,28 @@
+<svg viewBox="0 0 720 268" role="img">
+<rect class="b-bl" x="0" y="20" width="350" height="128" rx="6"/>
+<text class="s-capb" x="12" y="38">Authentication asks…</text>
+<text class="s-ttl" x="12" y="60">&quot;Are you who you say you are?&quot;</text>
+<text class="s-sm" x="12" y="80">Grace logs in with her password and a one-time code.</text>
+<text class="s-sm" x="12" y="95">The system is now sure she is Grace, of Nyati Cinemas.</text>
+<rect class="b" x="12" y="104" width="326" height="34"/>
+<text class="s-lb" x="22" y="120">✓ Identity established</text>
+<text class="s-xs" x="22" y="132">This is the front door lock. It is necessary. It is not enough.</text>
+
+<rect class="b-am" x="370" y="20" width="350" height="128" rx="6"/>
+<text class="s-cap" x="382" y="38">Isolation asks…</text>
+<text class="s-ttl" x="382" y="60">&quot;Can you reach what isn't yours?&quot;</text>
+<text class="s-sm" x="382" y="80">Grace is genuinely Grace. She now requests booking</text>
+<text class="s-sm" x="382" y="95">#4471 — which belongs to Prestige Screens.</text>
+<rect class="b" x="382" y="104" width="326" height="34"/>
+<text class="s-lb" x="392" y="120">✗ Must be refused — by a rule she cannot bypass</text>
+<text class="s-xs" x="392" y="132">This is the wall between flats. Different problem, different tool.</text>
+
+<rect class="b-rd" x="0" y="162" width="720" height="44" rx="5"/>
+<text class="s-hd" x="14" y="180">The single most expensive mistake in multi-tenancy</text>
+<text class="s-sm" x="14" y="197">Believing that because login works, tenants are separated. A logged-in user with a valid token who changes an ID in the URL is the classic breach.</text>
+
+<rect class="b-gr" x="0" y="216" width="720" height="48" rx="5"/>
+<text class="s-hd" x="14" y="234">The rule to live by</text>
+<text class="s-sm" x="14" y="251">Authentication happens once, at the edge. Isolation must be enforced on every single data access, by something lower than the</text>
+<text class="s-sm" x="14" y="262">feature developer — a database policy, a scoped credential, a framework the developer cannot forget to call.</text>
+</svg>

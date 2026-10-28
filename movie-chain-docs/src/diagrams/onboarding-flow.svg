@@ -1,0 +1,38 @@
+<svg viewBox="0 0 720 300" role="img">
+<text class="s-cap" x="0" y="11">Onboarding — the most underrated feature in any SaaS</text>
+<rect class="b" x="0" y="22" width="112" height="52"/><text class="s-hd mid-a" x="56" y="42">1 · Sign-up</text><text class="s-xs mid-a" x="56" y="56">Chain fills a form</text><text class="s-xs mid-a" x="56" y="68">or sales clicks it</text>
+<path class="ln-a" d="M112 48 L134 48" marker-end="url(#ah-a)"/>
+<rect class="b-am" x="134" y="22" width="112" height="52"/><text class="s-hd mid-a" x="190" y="42">2 · Tenant record</text><text class="s-xs mid-a" x="190" y="56">Allocate tenant_id</text><text class="s-xs mid-a" x="190" y="68">status = PROVISIONING</text>
+<path class="ln-a" d="M246 48 L268 48" marker-end="url(#ah-a)"/>
+<rect class="b-am" x="268" y="22" width="112" height="52"/><text class="s-hd mid-a" x="324" y="42">3 · Identity</text><text class="s-xs mid-a" x="324" y="56">Create admin user</text><text class="s-xs mid-a" x="324" y="68">attach tenant claim</text>
+<path class="ln-a" d="M380 48 L402 48" marker-end="url(#ah-a)"/>
+<rect class="b-am" x="402" y="22" width="112" height="52"/><text class="s-hd mid-a" x="458" y="42">4 · Resources</text><text class="s-xs mid-a" x="458" y="56">Pooled: nothing</text><text class="s-xs mid-a" x="458" y="68">Siloed: build stack</text>
+<path class="ln-a" d="M514 48 L536 48" marker-end="url(#ah-a)"/>
+<rect class="b-am" x="536" y="22" width="90" height="52"/><text class="s-hd mid-a" x="581" y="42">5 · Seed</text><text class="s-xs mid-a" x="581" y="56">Defaults, roles,</text><text class="s-xs mid-a" x="581" y="68">sample data</text>
+<path class="ln-a" d="M626 48 L648 48" marker-end="url(#ah-a)"/>
+<rect class="b-gr" x="648" y="22" width="72" height="52"/><text class="s-hd mid-a" x="684" y="42">6 · Live</text><text class="s-xs mid-a" x="684" y="60">ACTIVE</text>
+
+<path class="ln-r" d="M458 74 L458 96" marker-end="url(#ah-r)"/>
+<rect class="b-rd" x="286" y="96" width="344" height="52" rx="5"/>
+<text class="s-hd" x="298" y="114">Step 4 fails half-way — now what?</text>
+<text class="s-sm" x="298" y="130">A tenant stuck in PROVISIONING with three of six resources built is</text>
+<text class="s-sm" x="298" y="142">the classic mess. Track every resource you create, so you can undo it.</text>
+<rect class="b-w" x="0" y="96" width="272" height="52" rx="5"/>
+<text class="s-hd" x="12" y="114">Make onboarding a state machine</text>
+<text class="s-mono" x="12" y="131">PENDING → PROVISIONING → ACTIVE</text>
+<text class="s-mono" x="12" y="143">           ↓ FAILED → (retry | rollback)</text>
+
+<rect class="b-n" x="0" y="164" width="720" height="60" rx="5"/>
+<text class="s-hdw" x="14" y="183">Why this deserves real engineering</text>
+<text class="s-smw" x="14" y="201">Onboarding is the only part of your system that touches every other part — identity, billing, data, infrastructure, permissions.</text>
+<text class="s-smw" x="14" y="216">If it is a manual runbook, you do not have a SaaS: you have a hosting business with extra steps.</text>
+
+<rect class="b-am" x="0" y="234" width="352" height="62" rx="5"/>
+<text class="s-hd" x="12" y="252">Test it like production</text>
+<text class="s-sm" x="12" y="269">Onboard a throwaway tenant on every deploy. It is the</text>
+<text class="s-sm" x="12" y="282">single best smoke test a multi-tenant system can have.</text>
+<rect class="b-w" x="368" y="234" width="352" height="62" rx="5"/>
+<text class="s-hd" x="380" y="252">And the reverse: off-boarding</text>
+<text class="s-sm" x="380" y="269">Tenants leave. Deleting one tenant's data out of shared</text>
+<text class="s-sm" x="380" y="282">tables — provably, on a deadline — is a design input.</text>
+</svg>

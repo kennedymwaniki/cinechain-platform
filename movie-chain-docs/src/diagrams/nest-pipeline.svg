@@ -1,0 +1,41 @@
+<svg viewBox="0 0 720 300" role="img">
+<text class="s-cap" x="0" y="11">The NestJS request pipeline — and exactly where tenancy hooks in</text>
+<rect class="b" x="0" y="22" width="86" height="40"/><text class="s-lb mid-a" x="43" y="40">Request</text><text class="s-xs mid-a" x="43" y="54">HTTP in</text>
+<path class="ln" d="M86 42 L104 42" marker-end="url(#ah)"/>
+<rect class="b-am" x="104" y="22" width="112" height="40"/><text class="s-lb mid-a" x="160" y="38">Middleware</text><text class="s-xs mid-a" x="160" y="51">request-id, raw body</text>
+<path class="ln" d="M216 42 L234 42" marker-end="url(#ah)"/>
+<rect class="b-am" x="234" y="22" width="112" height="40"/><text class="s-lb mid-a" x="290" y="38">Guard</text><text class="s-xs mid-a" x="290" y="51">JwtAuthGuard</text>
+<path class="ln" d="M346 42 L364 42" marker-end="url(#ah)"/>
+<rect class="b-am" x="364" y="22" width="130" height="40"/><text class="s-lb mid-a" x="429" y="38">Interceptor</text><text class="s-xs mid-a" x="429" y="51">TenantContextInterceptor</text>
+<path class="ln" d="M494 42 L512 42" marker-end="url(#ah)"/>
+<rect class="b" x="512" y="22" width="96" height="40"/><text class="s-lb mid-a" x="560" y="38">Pipe</text><text class="s-xs mid-a" x="560" y="51">DTO validation</text>
+<path class="ln" d="M608 42 L626 42" marker-end="url(#ah)"/>
+<rect class="b-bl" x="626" y="22" width="94" height="40"/><text class="s-lb mid-a" x="673" y="38">Controller</text><text class="s-xs mid-a" x="673" y="51">your code</text>
+
+<path class="ln-a" d="M429 62 L429 84" marker-end="url(#ah-a)"/>
+<rect class="b-am" x="150" y="84" width="560" height="76" rx="5"/>
+<text class="s-hd" x="162" y="102">TenantContextInterceptor — the single most important class in the codebase</text>
+<text class="s-sm" x="162" y="120">1 · Read <tspan class="s-mono">tenant_id</tspan> from the verified JWT (never from a header, query param or body)</text>
+<text class="s-sm" x="162" y="135">2 · Store it in <tspan class="s-mono">AsyncLocalStorage</tspan> so it follows the request across every await, with no parameter passing</text>
+<text class="s-sm" x="162" y="150">3 · Open the transaction and issue <tspan class="s-mono">SET LOCAL app.tenant_id</tspan> — from here, Postgres enforces the boundary</text>
+<rect class="b-rd" x="0" y="84" width="140" height="76" rx="5"/>
+<text class="s-lb" x="8" y="102">No claim?</text>
+<text class="s-xs" x="8" y="118">401. Not a default,</text>
+<text class="s-xs" x="8" y="131">not a fallback, not</text>
+<text class="s-xs" x="8" y="144">&quot;the first tenant&quot;.</text>
+<text class="s-xs" x="8" y="157">Fail closed.</text>
+
+<rect class="b-n" x="0" y="176" width="720" height="60" rx="5"/>
+<text class="s-hdw" x="12" y="194">Why AsyncLocalStorage and not a parameter</text>
+<text class="s-smw" x="12" y="212">Threading <tspan class="s-monow">tenantId</tspan> through every method signature works — until someone adds a service that forgets. ALS makes the</text>
+<text class="s-smw" x="12" y="227">correct thing automatic, which is the only kind of security control that survives a growing team.</text>
+
+<rect class="b-am" x="0" y="246" width="350" height="52" rx="5"/>
+<text class="s-lb" x="10" y="263">Supporting cast</text>
+<text class="s-xs" x="10" y="278">Drizzle · BullMQ (workers) · Passport · Zod</text>
+<text class="s-xs" x="10" y="291">Terminus (health) · Pino (logs) · OpenTelemetry</text>
+<rect class="b-w" x="370" y="246" width="350" height="52" rx="5"/>
+<text class="s-lb" x="380" y="263">The one gotcha</text>
+<text class="s-xs" x="380" y="278">Background jobs have no request. Workers must set tenant</text>
+<text class="s-xs" x="380" y="291">context from the job payload, at the top of every handler.</text>
+</svg>

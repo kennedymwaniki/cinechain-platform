@@ -1,0 +1,122 @@
+<h2><span class="num">8</span>API Design</h2>
+
+<h3>8.1 Conventions</h3>
+<ul class="clean">
+<li><b>Base path</b> <code>/api/v1</code>. The version is in the path because tenants integrate with it and cannot all be migrated at once.</li>
+<li><b>Tenant</b> is established differently for the two populations of §4.2, and this is the most important convention on the page:
+<ul class="tight">
+<li><b>Staff endpoints</b> take it from the JWT <code>tenant_id</code> claim. It never appears in a path or query parameter.</li>
+<li><b>Consumer endpoints</b> have no tenant claim to read. The tenant is derived server-side from the resource — <code>screening.tenant_id</code> for a hold, the signed hold token for a booking. The caller supplies an object id; the server supplies the tenant.</li>
+</ul></li>
+<li><b>Token type gates the endpoint.</b> A token carrying <code>tenant_id</code> is a staff token and is rejected on consumer endpoints; a token without one is a consumer token and is rejected on staff endpoints. Both rejections are <code>403</code> and both are logged as security events.</li>
+<li><b>Money</b> is always an integer in minor units with an explicit currency. No floats, anywhere, ever.</li>
+<li><b>Times</b> are RFC 3339 with an offset. The theatre's timezone is returned alongside, because &ldquo;the 20:30 showing&rdquo; is a local-time concept.</li>
+<li><b>Idempotency</b><span class="cite g2">Stripe — Idempotent requests</span><span class="cite g2">Brandur — Idempotency keys</span> — every state-changing endpoint accepts an <code>Idempotency-Key</code> header; payment endpoints require one.</li>
+<li><b>Pagination</b> is cursor-based. Offset pagination degrades badly on the large tables here.</li>
+</ul>
+
+<h3>8.2 Endpoint catalogue</h3>
+<table>
+<caption>Application plane — consumer endpoints (guest or logged-in; <b>no tenant claim</b>)</caption>
+<thead><tr><th style="width:8%">Method</th><th style="width:34%">Path</th><th style="width:16%">Role</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td>GET</td><td><code>/films</code></td><td>public</td><td>Films with showings in a town and date range</td></tr>
+<tr><td>GET</td><td><code>/films/:id/screenings</code></td><td>public</td><td>Showtimes grouped by theatre</td></tr>
+<tr><td>GET</td><td><code>/screenings/:id/seatmap</code></td><td>public</td><td>Layout plus availability. Cached 5 s; never reveals who holds a seat</td></tr>
+<tr><td>POST</td><td><code>/screenings/:id/holds</code></td><td>guest or consumer</td><td><b>Acquire a hold.</b> Tenant derived from the screening. Returns a signed <code>hold_token</code> and <code>expires_at</code></td></tr>
+<tr><td>DELETE</td><td><code>/holds/:hold_id</code></td><td>bearer of hold_token</td><td>Release early</td></tr>
+<tr><td>POST</td><td><code>/holds/:hold_id/extend</code></td><td>bearer of hold_token</td><td>One extension of 120 s if uncontested</td></tr>
+<tr><td>POST</td><td><code>/bookings</code></td><td>bearer of hold_token</td><td><b>Convert a hold to a booking.</b> Guest supplies name + e-mail; a consumer token additionally links <code>consumer_id</code>. Requires <code>Idempotency-Key</code></td></tr>
+<tr><td>GET</td><td><code>/bookings</code></td><td>consumer</td><td>Own bookings <b>across every chain</b> — scoped by <code>consumer_id</code>, deliberately not by tenant (FR-76)</td></tr>
+<tr><td>GET</td><td><code>/bookings/lookup</code></td><td>guest</td><td>Retrieve by reference <b>+ e-mail</b>, or a signed expiring link. Reference alone is never sufficient (FR-73)</td></tr>
+<tr><td>POST</td><td><code>/auth/register</code></td><td>public</td><td>Optional CineChain account. Issues a consumer token with <b>no</b> tenant claim (FR-74)</td></tr>
+<tr><td>POST</td><td><code>/bookings/:id/cancel</code></td><td>consumer or guest</td><td>Cancel within the selling chain's policy window</td></tr>
+</tbody></table>
+
+<table>
+<caption>Application plane — staff endpoints (<b>tenant claim required</b>)</caption>
+<thead><tr><th style="width:8%">Method</th><th style="width:34%">Path</th><th style="width:16%">Role</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td>POST</td><td><code>/tickets/:code/redeem</code></td><td>box_office</td><td>Scan at the door; atomic, single-use</td></tr>
+<tr><td>POST</td><td><code>/theatres</code> · <code>/screens</code> · <code>/seats:generate</code></td><td>manager</td><td>Venue configuration</td></tr>
+<tr><td>POST</td><td><code>/screenings</code></td><td>manager</td><td>Schedule; overlap rejected by the database</td></tr>
+<tr><td>POST</td><td><code>/screenings/:id/cancel</code></td><td>manager</td><td>Cancel with bulk refund</td></tr>
+<tr><td>GET</td><td><code>/reports/occupancy</code> · <code>/reports/revenue</code></td><td>manager, admin</td><td>Tenant-scoped aggregates</td></tr>
+<tr><td>POST</td><td><code>/webhooks/payments/:provider</code></td><td>—</td><td>Signature-verified; tenant derived from the stored payment record</td></tr>
+</tbody></table>
+
+<table>
+<caption>Control plane — separate application, separate credentials</caption>
+<thead><tr><th style="width:8%">Method</th><th style="width:34%">Path</th><th style="width:16%">Role</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td>POST</td><td><code>/admin/tenants</code></td><td>operator</td><td>Begin onboarding</td></tr>
+<tr><td>GET</td><td><code>/admin/tenants/:id/status</code></td><td>operator</td><td>Onboarding state machine progress</td></tr>
+<tr><td>PATCH</td><td><code>/admin/tenants/:id/tier</code></td><td>operator</td><td>Change tier; may trigger migration</td></tr>
+<tr><td>POST</td><td><code>/admin/tenants/:id/suspend</code></td><td>operator</td><td>Block access, retain data</td></tr>
+<tr><td>POST</td><td><code>/admin/tenants/:id/offboard</code></td><td>operator</td><td>Export then verifiably delete</td></tr>
+<tr><td>GET</td><td><code>/admin/metering</code></td><td>operator</td><td>Consumption per tenant — <b>aggregates only, never booking data</b></td></tr>
+</tbody></table>
+
+<h3>8.3 The two endpoints that matter</h3>
+<div class="code-label">POST /api/v1/screenings/88/holds</div>
+<pre><code><span class="cm">// request — no auth required at all. No tenant_id anywhere:</span>
+<span class="cm">// the server derives it from screening 88.</span>
+{ <span class="nb">"seat_ids"</span>: [<span class="st">"a1f3-…"</span>, <span class="st">"b7c2-…"</span>] }
+
+<span class="cm">// 201 Created</span>
+{ <span class="nb">"hold_id"</span>: <span class="st">"h_7f21…"</span>,
+  <span class="cm">// signed; replay this on POST /bookings. Possession = the seat.</span>
+  <span class="nb">"hold_token"</span>: <span class="st">"eyJhbGciOi…"</span>,
+  <span class="nb">"expires_at"</span>: <span class="st">"2026-06-14T17:35:00Z"</span>,   <span class="cm">// drive the countdown from this</span>
+  <span class="nb">"seconds_remaining"</span>: 300,
+  <span class="nb">"seats"</span>: [{ <span class="nb">"id"</span>: <span class="st">"a1f3-…"</span>, <span class="nb">"label"</span>: <span class="st">"E6"</span>, <span class="nb">"class"</span>: <span class="st">"vip"</span>,
+              <span class="nb">"price_minor"</span>: 140000, <span class="nb">"currency"</span>: <span class="st">"KES"</span> }],
+  <span class="nb">"total_minor"</span>: 290000 }
+
+<span class="cm">// 409 Conflict — someone else won the race</span>
+{ <span class="nb">"error"</span>: <span class="st">"seats_unavailable"</span>,
+  <span class="nb">"unavailable_seat_ids"</span>: [<span class="st">"b7c2-…"</span>],
+  <span class="nb">"message"</span>: <span class="st">"Seat E7 was taken moments ago."</span> }</code></pre>
+
+<div class="code-label">POST /api/v1/bookings</div>
+<pre><code><span class="cm">// request — Idempotency-Key header REQUIRED.</span>
+<span class="cm">// A guest sends exactly this and nothing else. A logged-in consumer</span>
+<span class="cm">// sends the same body plus a bearer token; the server then also</span>
+<span class="cm">// stamps consumer_id on the booking.</span>
+{ <span class="nb">"hold_token"</span>: <span class="st">"eyJhbGciOi…"</span>,
+  <span class="nb">"payment_method"</span>: <span class="st">"mpesa"</span>,
+  <span class="nb">"phone"</span>: <span class="st">"+2547…"</span>,
+  <span class="nb">"contact"</span>: { <span class="nb">"name"</span>: <span class="st">"Grace W."</span>, <span class="nb">"email"</span>: <span class="st">"…"</span> } }
+
+<span class="cm">// 201 Created</span>
+{ <span class="nb">"booking_id"</span>: <span class="st">"bk_…"</span>, <span class="nb">"reference"</span>: <span class="st">"NYT-4471"</span>,
+  <span class="nb">"status"</span>: <span class="st">"confirmed"</span>, <span class="nb">"total_minor"</span>: 290000,
+  <span class="nb">"tickets"</span>: [{ <span class="nb">"seat"</span>: <span class="st">"E6"</span>, <span class="nb">"code"</span>: <span class="st">"…"</span>, <span class="nb">"qr_url"</span>: <span class="st">"…"</span> }] }
+
+<span class="cm">// 410 Gone — the hold died before payment was attempted.</span>
+<span class="cm">// No charge was made. This is the good failure.</span>
+{ <span class="nb">"error"</span>: <span class="st">"hold_expired"</span>, <span class="nb">"seats_still_available"</span>: true }
+
+<span class="cm">// 402 — charged, then found the seats gone. Already refunded.</span>
+{ <span class="nb">"error"</span>: <span class="st">"seats_lost_payment_refunded"</span>,
+  <span class="nb">"refund_reference"</span>: <span class="st">"rf_…"</span>,
+  <span class="nb">"message"</span>: <span class="st">"Your seats were taken. You have not been charged."</span> }</code></pre>
+
+<h3>8.4 Error model</h3>
+<table>
+<thead><tr><th style="width:10%">Status</th><th style="width:26%">Code</th><th>When, and what the client should do</th></tr></thead>
+<tbody>
+<tr><td>401</td><td><code>no_tenant_context</code></td><td>A <b>staff</b> endpoint received a token with no <code>tenant_id</code>. Never defaulted — re-authenticate.</td></tr>
+<tr><td>403</td><td><code>wrong_token_type</code></td><td>A consumer token on a staff endpoint, or a staff token on a consumer endpoint. Logged as a security event; see §8.1.</td></tr>
+<tr><td>401</td><td><code>hold_token_invalid</code></td><td>The signed hold token is missing, malformed, expired or was minted for a different screening.</td></tr>
+<tr><td>403</td><td><code>tenant_mismatch</code></td><td>The requested resource belongs to another tenant. Logged as a security event with the attempted resource.</td></tr>
+<tr><td>404</td><td><code>not_found</code></td><td>Also returned when a resource exists but belongs to another tenant — <b>never</b> 403, which would confirm its existence.</td></tr>
+<tr><td>409</td><td><code>seats_unavailable</code></td><td>Lost the race. Refresh the map and let the customer choose again.</td></tr>
+<tr><td>410</td><td><code>hold_expired</code></td><td>Hold died before payment. Offer re-hold.</td></tr>
+<tr><td>429</td><td><code>rate_limited</code></td><td>Tenant or user limit reached. <code>Retry-After</code> and the limit that was hit are both returned.</td></tr>
+<tr><td>503</td><td><code>payment_provider_unavailable</code></td><td>Hold is preserved where possible; the client should retry with the same idempotency key.</td></tr>
+</tbody></table>
+
+<div class="box warn"><span class="bt">Why a cross-tenant request returns 404 rather than 403</span>
+<p>Returning 403 for a resource that exists in another tenant confirms that it exists. Repeated across an ID space, that is an enumeration oracle: a competitor can map how many bookings a rival is taking by observing which identifiers return 403 and which return 404.</p>
+<p>Return 404 for both &ldquo;does not exist&rdquo; and &ldquo;exists but is not yours&rdquo;. Log the difference internally as a security event — the client learns nothing, and you learn everything.</p></div>

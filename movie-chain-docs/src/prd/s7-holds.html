@@ -1,0 +1,135 @@
+<h2><span class="num">7</span>The Seat-Hold Engine</h2>
+<p class="lede">Everything else in this system is ordinary CRUD. This is the part that is genuinely hard, the part that will produce your worst production incidents, and the part worth designing carefully before writing a line of code.</p>
+
+<h3>7.1 What the engine must guarantee</h3>
+<table>
+<thead><tr><th style="width:10%">ID</th><th style="width:30%">Guarantee</th><th>What it means precisely</th></tr></thead>
+<tbody>
+<tr><td>G-1</td><td><b>Exclusivity</b></td><td>At any instant, a given seat at a given screening is held or owned by at most one party. Not &ldquo;usually&rdquo;; not &ldquo;unless two requests arrive in the same millisecond&rdquo;.</td></tr>
+<tr><td>G-2</td><td><b>Bounded holds</b></td><td>A hold expires automatically after its window with no user action, no browser still open, and no scheduled job on the critical path.</td></tr>
+<tr><td>G-3</td><td><b>No lost inventory</b></td><td>A seat never remains blocked after its hold has expired, even if the application crashed mid-request.</td></tr>
+<tr><td>G-4</td><td><b>No double sale</b></td><td>Two confirmed bookings for the same seat at the same screening must be impossible, regardless of cache state or provider behaviour.</td></tr>
+<tr><td>G-5</td><td><b>Tenant containment</b></td><td>A hold is visible and contestable only within its own tenant. Nyati's holds are invisible to Prestige, including through timing or error messages.</td></tr>
+<tr><td>G-7</td><td><b>No account required</b></td><td>A hold can be acquired, kept and converted to a paid booking by someone with no account at all (FR-70). Ownership of a hold is therefore not an identity question.</td></tr>
+<tr><td>G-6</td><td><b>Honest money</b></td><td>A customer is never charged for a seat they do not receive. If that ever occurs, it is detected and refunded automatically without a support ticket.</td></tr>
+</tbody></table>
+
+<h3>7.2 The race condition, stated plainly</h3>
+<p>The obvious implementation is wrong, and it is worth seeing exactly why before seeing the fix.</p>
+
+<figure>{{d:concurrency-race}}<figcaption><b>Figure 7.1.</b> Check-then-act versus a single atomic operation. The left-hand pattern is not merely unlikely to fail — it fails reliably at the exact moment your system is busiest.</figcaption></figure>
+
+<p>Reading the seat's status and then writing it are two separate round trips. Between them, any number of other requests can run. On a quiet Tuesday this never manifests. At 18:00 on the Friday a blockbuster opens — precisely when hundreds of people are competing for the same few good seats — it manifests constantly.</p>
+<p>The fix is never to check more carefully. It is to collapse the check and the act into a single operation the datastore guarantees is indivisible.</p>
+
+<h3>7.3 The design</h3>
+<p>We use two datastores, each for what it is genuinely good at.</p>
+<div class="grid2">
+<div class="card on"><h5>Redis — the fast path</h5>
+<p><b>Holds the contention.</b> <code>SET key value NX EX 300</code><span class="cite g2">Redis — SET command</span> is atomic and gives us expiry for free — no timer, no cron job, no code that can fail to run.</p>
+<p>It also absorbs seat-map polling, which would otherwise be the heaviest read load in the system.</p></div>
+<div class="card"><h5>PostgreSQL — the truth</h5>
+<p><b>Holds the record.</b> <code>PRIMARY KEY (screening_id, seat_id)</code> makes a double sale structurally impossible, whatever Redis does.</p>
+<p>Survives restarts, is backed up, and is what the business reconciles against.</p></div>
+</div>
+
+<div class="box key"><span class="bt">The rule that keeps this sound</span>
+<p>Correctness must never depend on the cache. Redis can be flushed, can fail over, and can lose a recent write. So the durable uniqueness constraint in PostgreSQL is not redundancy — it is the actual guarantee. Redis makes the common case fast and self-expiring; Postgres makes the guarantee true.</p>
+<p>If you must choose only one, choose Postgres and accept a sweeper job. Never choose only Redis.</p></div>
+
+<figure class="fig-wide">{{d:seat-hold-sequence}}<figcaption><b>Figure 7.2.</b> The complete booking sequence, including the expiry path. Note that expiry involves no code at all on the critical path — the TTL is the mechanism.</figcaption></figure>
+
+<h4>Who owns a hold, when there is no user</h4>
+<p>Guarantee G-7 says the buyer may have no account. A hold therefore cannot belong to a user id — it belongs to a <b>signed hold token</b> the server issues and the client returns.</p>
+<div class="code-label">The hold token</div>
+<pre class="lite"><code>hold_token = sign({ hold_id, screening_id, tenant_id, exp }, server_key)
+
+  · opaque and signed — the client cannot alter or forge one
+  · returned by POST /holds, replayed on POST /bookings
+  · possession IS the claim to the seat; no identity is consulted
+  · lifetime exactly matches the hold, so a stale token is self-evidently dead
+
+Why not a session cookie or a user id?
+  · a guest has neither (FR-70)
+  · a signed token works identically for guests, logged-in consumers
+    and box-office clerks — one mechanism, not three
+  · it survives a page refresh, which a memory-held id does not</code></pre>
+<p>Note that <code>tenant_id</code> is inside the signed token. It is placed there by the server from <code>screening.tenant_id</code> — never supplied by the caller — so the booking step does not have to re-derive it, and a token minted for a Nyati screening can never be presented against a Prestige one.</p>
+
+<h4>Key design</h4>
+<div class="code-label">Redis key structure</div>
+<pre class="lite"><code>lock:t:{tenant_id}:scr:{screening_id}:seat:{seat_id}  ->  {hold_id}   TTL 300s
+
+Why the tenant is in the key, first:
+  · G-5 — a scan or key-space notification cannot span tenants
+  · a mis-scoped screening_id cannot collide across tenants
+  · per-tenant memory usage becomes measurable for cost attribution
+  · a tenant can be evicted from cache wholesale when offboarded</code></pre>
+
+<h4>Acquiring a multi-seat hold</h4>
+<p>A customer selecting three seats<span class="cite g2">Redis — Distributed locks</span> must get all three or none — a partial hold is a poor experience and leaks inventory. The operation must therefore be atomic across several keys, which means a Lua script (Redis executes scripts atomically) rather than a sequence of commands.</p>
+<div class="code-label">Lua — all-or-nothing hold</div>
+<pre><code><span class="cm">-- KEYS: one per seat.  ARGV[1] = hold_id, ARGV[2] = ttl seconds</span>
+<span class="kw">for</span> i = 1, #KEYS <span class="kw">do</span>
+  <span class="kw">if</span> redis.call(<span class="st">'EXISTS'</span>, KEYS[i]) == 1 <span class="kw">then</span>
+    <span class="kw">return</span> {0, i}                       <span class="cm">-- report which seat lost</span>
+  <span class="kw">end</span>
+<span class="kw">end</span>
+<span class="kw">for</span> i = 1, #KEYS <span class="kw">do</span>
+  redis.call(<span class="st">'SET'</span>, KEYS[i], ARGV[1], <span class="st">'NX'</span>, <span class="st">'EX'</span>, ARGV[2])
+<span class="kw">end</span>
+<span class="kw">return</span> {1, 0}</code></pre>
+<p>Because the whole script runs atomically, no other request can interleave between the existence checks and the writes. This is the single-operation principle applied to a set of seats rather than one.</p>
+
+<h3>7.4 Failure modes, and what happens in each</h3>
+<p>This table is the real specification of the engine. Each row is a test case.</p>
+<table>
+<thead><tr><th style="width:26%">What goes wrong</th><th style="width:30%">System response</th><th>Customer experience</th></tr></thead>
+<tbody>
+<tr><td>Two customers request the same seat simultaneously</td><td>Redis <code>NX</code> admits exactly one; the other receives <code>409</code> naming the contested seats</td><td>Loser is told which seats went and the map refreshes instantly</td></tr>
+<tr><td>Customer abandons the browser</td><td>Redis TTL expires; sweeper marks the durable row <code>expired</code> within 60 s</td><td>Seats quietly return to sale</td></tr>
+<tr><td>Hold expires while the customer is on the payment page</td><td>Booking request rejected before any charge is attempted</td><td>Clear expiry screen; one-click re-hold if seats are still free</td></tr>
+<tr><td><b>Payment succeeds but the hold has expired</b></td><td>Refund issued automatically and immediately; booking marked <code>expired</code>; incident counter incremented</td><td>Told plainly that the seats were lost and the money returned — no ticket needed</td></tr>
+<tr><td>Payment provider times out with unknown status<span class="cite g2">Brandur — Idempotency keys</span></td><td>Hold extended to cover reconciliation; provider polled; idempotency key prevents a second charge</td><td>&ldquo;Confirming your payment&rdquo; then resolution within seconds</td></tr>
+<tr><td>Redis unavailable</td><td>Fall back to Postgres-only holds using <code>INSERT … ON CONFLICT DO NOTHING</code>; sweeper frequency raised to 10 s</td><td>Slightly slower seat map; bookings continue; no correctness loss</td></tr>
+<tr><td>Redis flushed or failed over, losing all locks</td><td>Postgres primary key still rejects any double sale; sweeper rebuilds cache from durable rows</td><td>Some live holds lost; affected customers must reselect. No double sales.</td></tr>
+<tr><td>Application crashes after Redis write, before Postgres write</td><td>Redis key expires on its own; no durable row was created</td><td>Seats free again within the hold window</td></tr>
+<tr><td>Application crashes after payment, before commit</td><td>Payment record exists without a booking; reconciliation job detects the orphan and refunds it</td><td>Refund arrives without the customer having to ask</td></tr>
+<tr><td>Screening cancelled while holds are live</td><td>All holds released, all sold tickets refunded, everyone notified</td><td>Refund plus explanation</td></tr>
+<tr><td>Clock skew between application servers</td><td>Expiry is decided by Redis and by Postgres <code>now()</code>, never by application clocks</td><td>No visible effect — which is the point</td></tr>
+</tbody></table>
+
+<div class="box warn"><span class="bt">The row in bold deserves your attention</span>
+<p>&ldquo;Payment succeeded but the seats are gone&rdquo; is the failure that generates furious customers and manual refunds. It is rare, it is unavoidable in principle, and it <em>must</em> be handled automatically.</p>
+<p>The mitigation has three parts. First, refuse to initiate payment when less than 45 seconds of hold remain — offer an extension instead. Second, re-verify hold ownership immediately before capture. Third, if capture nonetheless succeeds against a lost hold, refund automatically within seconds and tell the customer what happened. A customer who is refunded before they notice the problem does not become a support ticket.</p></div>
+
+<h3>7.5 The sweeper</h3>
+<p>Redis expiry silently removes the key. The durable <code>seat_lock</code> row remains, still marked <code>held</code>, so a reconciling job is required.</p>
+<div class="code-label">Sweeper query — runs every 30 seconds, leader-elected</div>
+<pre><code><span class="cm">-- deliberately NOT tenant-scoped: this is a platform maintenance job</span>
+<span class="cm">-- running with elevated privileges, outside the RLS path. It is one of</span>
+<span class="cm">-- only two such jobs in the system, and both are reviewed as security code.</span>
+<span class="kw">DELETE FROM</span> seat_lock
+ <span class="kw">WHERE</span> status = <span class="st">'held'</span>
+   <span class="kw">AND</span> expires_at &lt; now() - interval <span class="st">'30 seconds'</span>
+ <span class="kw">RETURNING</span> tenant_id, screening_id, seat_id;</code></pre>
+<p>The thirty-second grace period matters: it ensures the durable row outlives the Redis key, so the sweeper never deletes a row whose hold is in the middle of being converted to a sale.</p>
+
+<div class="box note"><span class="bt">Why the sweeper is not the mechanism</span>
+<p>It would be possible to skip Redis and rely on the sweeper alone. The reason not to is latency of release. With a 30-second sweeper, a seat can sit unsellable for up to 30 seconds after its hold dies. On a sold-out blockbuster on-sale, those seconds are lost revenue and visible customer frustration — the seat map shows a seat as taken when it is actually free.</p>
+<p>Redis TTL releases the seat the instant it expires. The sweeper exists only to keep the durable record honest, which is a background concern rather than a customer-facing one.</p></div>
+
+<h3>7.6 Seat states</h3>
+<figure>{{d:seat-state-machine}}<figcaption><b>Figure 7.3.</b> The lifecycle of one seat at one screening, including the transitions that must be actively refused.</figcaption></figure>
+<p>Note the deliberate asymmetry in what customers see. Internally a seat may be AVAILABLE, HELD by this customer, HELD by another, SOLD or REDEEMED. Externally the seat map shows only three states: free, taken, and yours. Distinguishing &ldquo;held by someone else&rdquo; from &ldquo;sold&rdquo; in the UI would leak commercial information and invite abuse — a competitor could infer demand in real time by watching which seats are merely being considered.</p>
+
+<h3>7.7 Tuning the window</h3>
+<p>Five minutes is the default, configurable per tenant between two and fifteen. The trade-off is direct and should be revisited with real data after launch.</p>
+<table>
+<thead><tr><th style="width:18%">Window</th><th style="width:36%">Effect on completion</th><th>Effect on inventory</th></tr></thead>
+<tbody>
+<tr><td><b>2 minutes</b></td><td>Too short for M-Pesa, which requires the customer to confirm on their handset. Abandonment rises sharply.</td><td>Inventory turns over quickly</td></tr>
+<tr><td><b>5 minutes</b> <span class="tag a">default</span></td><td>Comfortable for card and M-Pesa, including a mistyped number and one retry.</td><td>Acceptable even on a sell-out</td></tr>
+<tr><td><b>10+ minutes</b></td><td>Little additional completion; most customers who will pay have paid within four.</td><td>On a sold-out screening, abandoned holds visibly starve real buyers</td></tr>
+</tbody></table>
+<p>The measurement that should drive any change is the distribution of <em>time from hold to payment</em> among customers who complete. Set the window at roughly the 95th percentile of that distribution, and re-check it whenever a payment method is added.</p>
