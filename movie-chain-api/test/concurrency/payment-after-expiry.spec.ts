@@ -7,7 +7,7 @@ import { Redis } from 'ioredis';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, inject, it, vi } from 'vitest';
 import { lockKey } from '../../src/inventory/redis-locks';
-import { Metrics } from '../../src/metrics/metrics.service';
+import { Metrics } from '../../src/observability/metrics.module';
 import { PaymentProviders } from '../../src/payment/payment-providers';
 import { bootBookingApp, postHold, seedSellable } from '../support/holds';
 import { asAdmin } from '../support/seed';

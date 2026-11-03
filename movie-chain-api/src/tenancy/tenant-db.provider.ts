@@ -11,6 +11,8 @@ export interface TenantDbOptions {
   url: string;
   max: number;
   applicationName?: string;
+  /** Give up waiting for a free connection after this long (default: wait). */
+  connectionTimeoutMillis?: number;
 }
 
 export function poolConfig(o: TenantDbOptions): PoolConfig {
@@ -21,6 +23,7 @@ export function poolConfig(o: TenantDbOptions): PoolConfig {
     // Kills a leaked scope that is holding a transaction open.
     idle_in_transaction_session_timeout: 10000,
     application_name: o.applicationName ?? 'cinechain-api',
+    ...(o.connectionTimeoutMillis ? { connectionTimeoutMillis: o.connectionTimeoutMillis } : {}),
   };
 }
 
@@ -46,6 +49,9 @@ export class TenantDb implements OnApplicationShutdown {
     const existing = internal.dbAls.getStore();
     if (existing) {
       if (existing.tenantId !== ctx.tenantId) throw new Error('Nested scope for a different tenant — forbidden.');
+      // Otherwise the inner work would silently run on the OUTER pool's connection
+      // (e.g. a report on booking's pool). Mark the handler @DeferTenantTransaction.
+      if (existing.owner !== this) throw new Error('Nested scope on a different pool — forbidden.');
       return this.withSavepoint(existing, fn);
     }
     if (!UUID_RE.test(ctx.tenantId)) throw new Error('tenantId is not a uuid');
@@ -58,7 +64,7 @@ export class TenantDb implements OnApplicationShutdown {
       // parameters, and interpolating instead is a SQL-injection sink.
       // is_local = true reverts the setting at COMMIT/ROLLBACK.
       await client.query(`SELECT set_config('app.tenant_id', $1, true)`, [ctx.tenantId]);
-      const scope: DbScope = { tenantId: ctx.tenantId, client, db: drizzle({ client, schema: appSchema }), depth: 0 };
+      const scope: DbScope = { tenantId: ctx.tenantId, client, db: drizzle({ client, schema: appSchema }), owner: this, depth: 0 };
       const result = await internal.dbAls.run(scope, fn);
       await client.query('COMMIT');
       return result;

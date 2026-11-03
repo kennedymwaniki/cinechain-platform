@@ -10,6 +10,12 @@ import { RedisModule } from '../redis/redis.module';
 import { CONTROL_DB_PROVIDER, ControlDb } from '../tenancy/control-db.provider';
 import { ControlExceptionsFilter } from './control-exceptions.filter';
 import { ControlHealthController } from './control-health.controller';
+import { ControlMetricsController } from './control-metrics.controller';
+import { METERING_QUEUE, MeteringAggregator, MeteringAggregatorProcessor } from '../metering/aggregator.processor';
+import { MeteringController } from './metering.controller';
+import { MeteringRepository } from '../metering/metering.repository';
+import { registerProducerQueue } from '../queue/queue.module';
+import { StorageModule } from '../storage/storage.module';
 import { OperatorAuthController, OperatorGuard } from './auth/operator-auth';
 import { OnboardingController } from './onboarding/onboarding.controller';
 import { OnboardingProcessor } from './onboarding/onboarding.processor';
@@ -27,6 +33,8 @@ import { StaffInviteMailer } from '../staff/staff-invite.mailer';
     RedisModule,
     QueueModule,
     TokensModule,
+    StorageModule,
+    registerProducerQueue(METERING_QUEUE),
     BullModule.registerQueueAsync({
       name: ONBOARDING_QUEUE,
       inject: [APP_CONFIG],
@@ -35,12 +43,15 @@ import { StaffInviteMailer } from '../staff/staff-invite.mailer';
       }),
     }),
   ],
-  controllers: [OperatorAuthController, OnboardingController, ControlHealthController],
+  controllers: [OperatorAuthController, OnboardingController, ControlHealthController, ControlMetricsController, MeteringController],
   providers: [
     CONTROL_DB_PROVIDER,
     OnboardingService,
     OnboardingProcessor,
     StaffInviteMailer,
+    MeteringRepository,
+    MeteringAggregator,
+    MeteringAggregatorProcessor,
     { provide: APP_GUARD, useClass: OperatorGuard },
     { provide: APP_PIPE, useClass: ZodValidationPipe },
     { provide: APP_FILTER, useClass: ControlExceptionsFilter },

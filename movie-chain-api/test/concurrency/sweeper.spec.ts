@@ -8,7 +8,7 @@ import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { lockKey } from '../../src/inventory/redis-locks';
 import { SweeperProcessor } from '../../src/inventory/sweeper.processor';
-import { Metrics } from '../../src/metrics/metrics.service';
+import { Metrics } from '../../src/observability/metrics.module';
 import { bootBookingApp, postHold, seedSellable } from '../support/holds';
 import { asAdmin } from '../support/seed';
 import { race } from './harness';

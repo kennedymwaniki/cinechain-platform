@@ -3,7 +3,7 @@ import { type BeforeApplicationShutdown, Inject, Logger, type OnModuleInit, Opti
 import type { Job, Queue } from 'bullmq';
 import { randomUUID } from 'node:crypto';
 import { CrossTenantJob } from '../common/elevated/cross-tenant-job';
-import { Metrics } from '../metrics/metrics.service';
+import { Metrics } from '../observability/metrics.module';
 import { RedisHealthBreaker } from '../redis/redis-health.breaker';
 import { RedisFactory } from '../redis/redis.module';
 import { SweeperDb } from '../tenancy/sweeper-db.provider';
@@ -26,6 +26,7 @@ export const SWEEP_BATCH = 5000;
 @Processor(SWEEPER_QUEUE)
 export class SweeperProcessor extends WorkerHost implements OnModuleInit, BeforeApplicationShutdown {
   private readonly log = new Logger(SweeperProcessor.name);
+  private reportedBacklog = new Set<string>();
 
   constructor(
     @InjectQueue(SWEEPER_QUEUE) private readonly queue: Queue,
@@ -96,6 +97,10 @@ export class SweeperProcessor extends WorkerHost implements OnModuleInit, Before
       this.metrics.inc('sweeper.reclaimed_total', { tenant }, t.n);
       this.metrics.set('sweeper.lag', { tenant }, t.lagS);
     }
+    // What is still past expiry after this sweep (a batch limit, a SKIP LOCKED row): the SweeperLag input.
+    const backlog = new Map((await this.sweeper.backlog(SWEEP_GRACE_SECONDS)).map((b) => [b.tenant_id, b.n]));
+    for (const t of new Set([...this.reportedBacklog, ...backlog.keys()])) this.metrics.set('seat_locks_past_expiry', { tenant: t }, backlog.get(t) ?? 0);
+    this.reportedBacklog = new Set(backlog.keys());
     return { ran: true, swept: rows.length };
   }
 }

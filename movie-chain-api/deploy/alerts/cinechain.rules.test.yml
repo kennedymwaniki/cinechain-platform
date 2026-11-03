@@ -1,0 +1,44 @@
+# promtool test rules deploy/alerts/cinechain.rules.test.yml
+# Proves the expressions fire on the situations they name — and not on normal traffic.
+rule_files: [cinechain.rules.yml]
+evaluation_interval: 1m
+
+tests:
+  - interval: 1m
+    input_series:
+      # Four tenants. a, b, c answer in under 50 ms; "slow" answers in 1-2.5 s (all its requests land in le=2.5).
+      - { series: 'cinechain_http_request_duration_seconds_bucket{tenant="a",le="0.05"}', values: '0+60x20' }
+      - { series: 'cinechain_http_request_duration_seconds_bucket{tenant="a",le="2.5"}', values: '0+60x20' }
+      - { series: 'cinechain_http_request_duration_seconds_bucket{tenant="a",le="+Inf"}', values: '0+60x20' }
+      - { series: 'cinechain_http_request_duration_seconds_bucket{tenant="b",le="0.05"}', values: '0+60x20' }
+      - { series: 'cinechain_http_request_duration_seconds_bucket{tenant="b",le="2.5"}', values: '0+60x20' }
+      - { series: 'cinechain_http_request_duration_seconds_bucket{tenant="b",le="+Inf"}', values: '0+60x20' }
+      - { series: 'cinechain_http_request_duration_seconds_bucket{tenant="c",le="0.05"}', values: '0+60x20' }
+      - { series: 'cinechain_http_request_duration_seconds_bucket{tenant="c",le="2.5"}', values: '0+60x20' }
+      - { series: 'cinechain_http_request_duration_seconds_bucket{tenant="c",le="+Inf"}', values: '0+60x20' }
+      - { series: 'cinechain_http_request_duration_seconds_bucket{tenant="slow",le="0.05"}', values: '0+0x20' }
+      - { series: 'cinechain_http_request_duration_seconds_bucket{tenant="slow",le="2.5"}', values: '0+60x20' }
+      - { series: 'cinechain_http_request_duration_seconds_bucket{tenant="slow",le="+Inf"}', values: '0+60x20' }
+      - { series: 'cinechain_double_sale_total{tenant="a"}', values: '0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1' }
+      - { series: 'cinechain_redis_up', values: '1+0x20' }
+    alert_rule_test:
+      - eval_time: 18m
+        alertname: NoisyNeighbour
+        exp_alerts:
+          - exp_labels: { tenant: slow, severity: ticket }
+            exp_annotations:
+              summary: "Tenant slow p95 is over 3x the median tenant's"
+              runbook: docs/runbooks/noisy-neighbour.md
+      - eval_time: 16m
+        alertname: DoubleSale
+        exp_alerts:
+          - exp_labels: { tenant: a, severity: page }
+            exp_annotations:
+              summary: "Double sale detected for tenant a"
+              runbook: docs/runbooks/double-sale.md
+      - eval_time: 10m
+        alertname: DoubleSale
+        exp_alerts: []
+      - eval_time: 18m
+        alertname: RedisUnavailable
+        exp_alerts: []

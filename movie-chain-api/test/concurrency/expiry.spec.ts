@@ -4,7 +4,7 @@
  * durable INSERT are the whole mechanism.
  */
 import type { INestApplication } from '@nestjs/common';
-import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
+import { afterAll, beforeAll, describe, inject, it } from 'vitest';
 import { HoldService } from '../../src/inventory/hold.service';
 import { toSystemContext } from '../../src/tenancy/system-context';
 import { postHold, seedSellable } from '../support/holds';
@@ -32,10 +32,9 @@ describe('expiry', () => {
     const expiresAt = Date.parse(first.expires_at);
     await postHold(app, t.screeningId, [t.seatIds[0]!]).expect(409);
 
-    while (Date.now() < expiresAt) await new Promise((r) => setTimeout(r, 10));
-    let res = await postHold(app, t.screeningId, [t.seatIds[0]!]);
-    while (res.status === 409 && Date.now() - expiresAt < 1_000) res = await postHold(app, t.screeningId, [t.seatIds[0]!]);
-    expect(res.status).toBe(201);
-    expect(Date.now() - expiresAt).toBeLessThan(100 + 50); // + the request's own round trip
+    // The guarantee, stated directly: a request ISSUED 100 ms after expiry gets the seat. (Measuring
+    // when a polling loop's response arrives would charge the machine's load to the system.)
+    while (Date.now() < expiresAt + 100) await new Promise((r) => setTimeout(r, 5));
+    await postHold(app, t.screeningId, [t.seatIds[0]!]).expect(201);
   });
 });

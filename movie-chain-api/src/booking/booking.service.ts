@@ -28,6 +28,7 @@ import { OutboxRelay } from './outbox.relay';
 import { newReference, prefixFor } from './reference.generator';
 import { BookingTokenService } from './booking-token.service';
 import { TicketQrService } from '../ticketing/qr.service';
+import { Metrics } from '../observability/metrics.module';
 import { RefundService } from './refund.service';
 
 /** Never start a capture if the hold could die before it finishes (§7.4). */
@@ -92,9 +93,11 @@ export class BookingService implements OnModuleInit {
     private readonly audit: AuditLog,
     private readonly bookingTokens: BookingTokenService,
     private readonly qr: TicketQrService,
+    private readonly metrics: Metrics,
   ) {}
 
   onModuleInit(): void {
+    this.metrics.inc('double_sale_total', { tenant: 'none' }, 0); // the series exists before it is ever needed
     // A capture that was still pending when we answered is settled later by the provider's callback.
     this.webhooks.onSettled((e) => this.settleLate(e.tenantId, e.bookingId));
   }
@@ -307,7 +310,7 @@ export class BookingService implements OnModuleInit {
     // Prices are captured onto the tickets now; per-seat prices always sum to what was charged.
     const sum = [...prices.values()].reduce((a, b) => a + b, 0);
     if (sum !== booking.totalMinor) prices.set(seats[0]!.id, prices.get(seats[0]!.id)! + booking.totalMinor - sum);
-    await this.repo.insertTickets(
+    await this.insertTicketsOrAlarm(ctx, booking, () => this.repo.insertTickets(
       booking.seatIds.map((seatId) => {
         const id = randomUUID();
         return {
@@ -320,7 +323,7 @@ export class BookingService implements OnModuleInit {
           currency: booking.currency,
         };
       }),
-    );
+    ));
 
     if (booking.guestEmail) {
       // Link to the account only when it is VERIFIED (FR-77): otherwise anyone could
@@ -342,8 +345,25 @@ export class BookingService implements OnModuleInit {
     return [
       // Hold and sale emit the SAME public event (§7.6): no tenant id, no hold id.
       await this.repo.outbox('seats:taken', { screeningId: booking.screeningId, seatIds: booking.seatIds }),
-      await this.repo.outbox('booking.confirmed', { bookingId: booking.id }),
+      await this.repo.outbox('booking.confirmed', { bookingId: booking.id, seats: booking.seatIds.length }),
     ];
+  }
+
+  /**
+   * A second live ticket for one seat is refused by ticket_seat_live_idx. It
+   * should be impossible (the conversion already decided); if it ever fires, a
+   * core guarantee broke: count it — the DoubleSale alert pages on any — and fail.
+   */
+  private async insertTicketsOrAlarm<T>(ctx: TenantContext, booking: Booking, insert: () => Promise<T>): Promise<T> {
+    try {
+      return await insert();
+    } catch (e) {
+      if ((e as { cause?: { constraint?: string } }).cause?.constraint === 'ticket_seat_live_idx') {
+        this.metrics.inc('double_sale_total', { tenant: ctx.tenantId });
+        this.log.error(`DOUBLE SALE refused for booking ${booking.reference}`);
+      }
+      throw e;
+    }
   }
 
   /** A capture that was pending at response time, settled by the provider's callback. */

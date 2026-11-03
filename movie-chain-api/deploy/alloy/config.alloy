@@ -1,0 +1,49 @@
+// Tails the API's JSON log files and ships them to Loki.
+//
+// Labels stay LOW-cardinality (service, level, context). tenant_id and
+// request_id are attached as STRUCTURED METADATA: filterable in LogQL
+// (| tenant_id="…") without one stream per tenant — the same reason the
+// metrics cap their tenant label.
+
+local.file_match "cinechain" {
+  path_targets = [{ "__path__" = "/var/log/cinechain/*.log" }]
+}
+
+loki.source.file "cinechain" {
+  targets    = local.file_match.cinechain.targets
+  forward_to = [loki.process.cinechain.receiver]
+}
+
+loki.process "cinechain" {
+  stage.json {
+    expressions = {
+      level      = "level",
+      service    = "service",
+      context    = "context",
+      tenant_id  = "tenant_id",
+      request_id = "request_id",
+      time       = "time",
+    }
+  }
+
+  stage.timestamp {
+    source = "time"
+    format = "RFC3339Nano"
+  }
+
+  stage.labels {
+    values = { level = "", service = "", context = "" }
+  }
+
+  stage.structured_metadata {
+    values = { tenant_id = "", request_id = "" }
+  }
+
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { Metrics } from '../observability/metrics.module';
 
 export const BREAKER_THRESHOLD = 3;
 export const BREAKER_OPEN_MS = 10_000;
@@ -17,6 +18,10 @@ export class RedisHealthBreaker {
   private failures = 0;
   private openUntil = 0;
   private readonly listeners: ((open: boolean) => void)[] = [];
+
+  constructor(@Optional() @Inject(Metrics) private readonly metrics: Metrics | null = null) {
+    this.metrics?.set('redis_up', {}, 1);
+  }
 
   isOpen(now = Date.now()): boolean {
     if (this.openUntil && now >= this.openUntil) {
@@ -56,6 +61,7 @@ export class RedisHealthBreaker {
   }
 
   private emit(open: boolean): void {
+    this.metrics?.set('redis_up', {}, open ? 0 : 1);
     for (const l of this.listeners) l(open);
   }
 }

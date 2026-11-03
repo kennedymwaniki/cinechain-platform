@@ -1,0 +1,70 @@
+# PRD §14.2 — the alerts that matter. Every expression is tenant-aware: an
+# alert that says "something is wrong" without "for whom" is half an alert.
+# `tenant` is the bounded label from src/observability/tenant-labels.ts
+# (the ~50 busiest tenants by id, the rest as "other").
+groups:
+  - name: cinechain-guarantees
+    rules:
+      - alert: DoubleSale
+        # Should be impossible (primary key + conditional conversion). Any occurrence means a core guarantee broke.
+        expr: sum by (tenant) (increase(cinechain_double_sale_total[5m])) > 0
+        labels: { severity: page }
+        annotations:
+          summary: "Double sale detected for tenant {{ $labels.tenant }}"
+          runbook: docs/runbooks/double-sale.md
+
+      - alert: SeatsLostAfterCapture
+        # Auto-refunded, but customers are being charged then refunded.
+        expr: sum by (tenant) (increase(cinechain_booking_seats_lost_after_capture_total[10m])) > 3
+        labels: { severity: page }
+        annotations:
+          summary: "{{ $value }} paid bookings lost their seats in 10 min (tenant {{ $labels.tenant }})"
+          runbook: docs/runbooks/payment-provider-outage.md
+
+      - alert: CrossTenantProbing
+        # The busiest single actor's attempts in the last minute, per tenant (a per-user label would be unbounded).
+        expr: max by (tenant) (cinechain_cross_tenant_attempts_max_per_actor) > 10
+        labels: { severity: ticket }
+        annotations:
+          summary: "One user made {{ $value }} cross-tenant attempts in a minute (tenant {{ $labels.tenant }})"
+          runbook: docs/runbooks/cross-tenant-data.md
+
+  - name: cinechain-health
+    rules:
+      - alert: NoisyNeighbour
+        # One tenant's p95 more than 3x the MEDIAN tenant's p95. Impossible without tenant labels.
+        expr: |
+          histogram_quantile(0.95, sum by (tenant, le) (rate(cinechain_http_request_duration_seconds_bucket[5m])))
+            > 3 * scalar(quantile(0.5, histogram_quantile(0.95, sum by (tenant, le) (rate(cinechain_http_request_duration_seconds_bucket[5m])))))
+        for: 10m
+        labels: { severity: ticket }
+        annotations:
+          summary: "Tenant {{ $labels.tenant }} p95 is over 3x the median tenant's"
+          runbook: docs/runbooks/noisy-neighbour.md
+
+      - alert: SweeperLag
+        # Held locks past expiry (beyond the 30 s grace): inventory silently withheld from sale.
+        expr: sum(cinechain_seat_locks_past_expiry) > 500
+        for: 2m
+        labels: { severity: page }
+        annotations:
+          summary: "{{ $value }} expired holds not yet reclaimed"
+          runbook: docs/runbooks/seat-taken-but-empty.md
+
+      - alert: OnboardingStuck
+        # Exported by the control plane. A half-created tenant is worse than none.
+        expr: max(cinechain_onboarding_stuck_runs) > 0
+        for: 1m
+        labels: { severity: page }
+        annotations:
+          summary: "{{ $value }} onboarding run(s) provisioning for over 5 minutes"
+          runbook: docs/runbooks/onboarding-stuck.md
+
+      - alert: RedisUnavailable
+        # The Postgres-only fallback is engaged: confirm bookings still succeed.
+        expr: min(cinechain_redis_up) == 0
+        for: 30s
+        labels: { severity: page }
+        annotations:
+          summary: "Redis unavailable on an API instance for over 30 s"
+          runbook: docs/runbooks/redis-down.md

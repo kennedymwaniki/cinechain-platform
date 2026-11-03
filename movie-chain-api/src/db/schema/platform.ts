@@ -1,4 +1,4 @@
-import { bigint, boolean, integer, jsonb, pgSchema, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { bigint, boolean, char, integer, jsonb, pgSchema, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { citext } from './types';
 
 /**
@@ -80,3 +80,19 @@ export const identityOutbox = platform.table('identity_outbox', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   processedAt: timestamp('processed_at', { withTimezone: true }),
 });
+
+/** Step 24. Counts per tenant per UTC month: nothing that identifies a booking or a person. */
+export const meteringUsage = platform.table(
+  'metering_usage',
+  {
+    tenantId: uuid('tenant_id').notNull(),
+    period: char('period', { length: 7 }).notNull(),
+    requests: bigint('requests', { mode: 'number' }).notNull().default(0),
+    storageBytes: bigint('storage_bytes', { mode: 'number' }).notNull().default(0),
+    holdSeconds: bigint('hold_seconds', { mode: 'number' }).notNull().default(0),
+    bookings: bigint('bookings', { mode: 'number' }).notNull().default(0),
+    tickets: bigint('tickets', { mode: 'number' }).notNull().default(0),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.tenantId, t.period] })],
+);

@@ -5,6 +5,7 @@ import type { StaffRole } from '../../db/schema/staff-user';
 import { forbidden, unauthorized } from '../../common/errors/api-error';
 import type { TenantScopedRequest } from '../../tenancy/tenant.interceptor';
 import { ConsumerGuard } from '../../tenancy/consumer.guard';
+import { announceTenant } from '../../tenancy/tenant-context';
 import { CONSUMER_ROUTE, IS_PUBLIC, STAFF_ROLES } from '../decorators';
 import { decodeUnverified } from '../jwt.service';
 import { type StaffClaims, TokenVerifier } from '../token-verifier';
@@ -59,6 +60,7 @@ export class AccessGuard implements CanActivate {
     if (roles?.length && !roles.includes(claims.role)) throw forbidden('insufficient_role', 'Your role cannot do this');
 
     req.staff = claims;
+    announceTenant(claims.tenant_id); // from here on, this request's logs, span and metrics carry the tenant
     req.tenantContext = { tenantId: claims.tenant_id, actor: { kind: 'staff', userId: claims.sub, role: claims.role } };
     return true;
   }

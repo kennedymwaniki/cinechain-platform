@@ -1,4 +1,4 @@
-import { HeadBucketCommand, PutObjectCommand, GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { HeadBucketCommand, ListObjectsV2Command, PutObjectCommand, GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Inject, Injectable, type OnApplicationShutdown } from '@nestjs/common';
 import { APP_CONFIG, type AppConfig } from '../config/app-config';
@@ -56,6 +56,19 @@ export class StorageService implements OnApplicationShutdown {
   async getSignedUrlForKey(key: string, expiresInSeconds = 300): Promise<string> {
     if (!/^t\/[0-9a-f-]{36}\/[A-Za-z0-9._/-]+$/.test(key) || key.includes('..')) throw new Error('not a tenant object key');
     return getSignedUrl(this.s3, new GetObjectCommand({ Bucket: this.bucket, Key: key }), { expiresIn: expiresInSeconds });
+  }
+
+  /** Bytes stored under t/<tenant_id>/ (metering, step 24). Pages through the whole prefix. */
+  async prefixBytes(tenantId: string): Promise<number> {
+    const prefix = `${StorageService.tenantKey(tenantId, ['x']).slice(0, -1)}`;
+    let total = 0;
+    let token: string | undefined;
+    do {
+      const page = await this.s3.send(new ListObjectsV2Command({ Bucket: this.bucket, Prefix: prefix, ContinuationToken: token }));
+      for (const o of page.Contents ?? []) total += o.Size ?? 0;
+      token = page.IsTruncated ? page.NextContinuationToken : undefined;
+    } while (token);
+    return total;
   }
 
   async ping(): Promise<void> {

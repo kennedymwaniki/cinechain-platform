@@ -46,6 +46,16 @@ export class SweeperDb implements OnApplicationShutdown {
     return rows;
   }
 
+  /** Held rows past expiry beyond the grace, per tenant: inventory silently withheld (SweeperLag alert). */
+  async backlog(graceSeconds: number): Promise<{ tenant_id: string; n: number }[]> {
+    const { rows } = await this.pool.query<{ tenant_id: string; n: number }>(
+      `SELECT tenant_id, count(*)::int AS n FROM seat_lock
+        WHERE status = 'held' AND expires_at < now() - $1::int * interval '1 second' GROUP BY tenant_id`,
+      [graceSeconds],
+    );
+    return rows;
+  }
+
   /** The role may touch seat_lock and nothing else in public, and nothing in platform. */
   async assertNarrowRole(): Promise<void> {
     const { rows } = await this.pool.query<{ problem: string }>(

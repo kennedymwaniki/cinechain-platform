@@ -4,7 +4,7 @@ import { AuditLog } from '../audit/audit-log.service';
 import { booking, loyaltyLedger } from '../db/schema/booking';
 import { payment, paymentRefund, type PaymentRefund } from '../db/schema/payment';
 import { tenantCustomer } from '../db/schema/tenant-customer';
-import { Metrics } from '../metrics/metrics.service';
+import { Metrics } from '../observability/metrics.module';
 import { PaymentProviders } from '../payment/payment-providers';
 import { type Currency, money } from '../shared/money';
 import { currentTenant, db, runWithTenant, type TenantContext } from '../tenancy/tenant-context';
@@ -110,7 +110,7 @@ export class RefundService {
    */
   async refundSeatsLost(ctx: TenantContext, bookingId: string, reason = 'seats_lost_after_capture'): Promise<RefundOutcome | null> {
     this.metrics.inc('booking.seats_lost_after_capture', { tenant: ctx.tenantId });
-    this.log.error(`PAGE: ${reason} for booking ${bookingId} (tenant ${ctx.tenantId}); refunding in full`);
+    await runWithTenant(ctx, async () => this.log.error(`PAGE: ${reason} for booking ${bookingId}; refunding in full`));
     const intent = await this.scope(ctx, async () => {
       await db()
         .update(booking)

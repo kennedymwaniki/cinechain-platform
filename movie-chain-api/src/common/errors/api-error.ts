@@ -3,6 +3,7 @@ import {
   ForbiddenError,
   NotFoundError,
   UnauthenticatedError,
+  UnavailableError,
   UnprocessableError,
   ValidationError,
 } from './domain-errors';
@@ -20,5 +21,6 @@ export const badRequest = (code: string, message: string, extra: Record<string, 
   new ValidationError(code, message, extra);
 export const conflict = (code: string, message: string, extra: Record<string, unknown> = {}) =>
   new ConflictError(code, message, extra);
+export const unavailable = (code: string, message: string) => new UnavailableError(code, message);
 export const unprocessable = (code: string, message: string, extra: Record<string, unknown> = {}) =>
   new UnprocessableError(code, message, extra);

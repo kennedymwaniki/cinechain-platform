@@ -11,7 +11,8 @@ import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { SweeperDb } from '../../src/tenancy/sweeper-db.provider';
 
 const SRC = join(__dirname, '../../src');
-const EXPECTED = ['SweeperProcessor']; // step 24 adds the metering roll-up
+// Exactly two, and final (convention 10). A third is a reviewed change to this line.
+const EXPECTED = ['MeteringAggregatorProcessor', 'SweeperProcessor'];
 
 const walk = (d: string): string[] => readdirSync(d).flatMap((f) => (statSync(join(d, f)).isDirectory() ? walk(join(d, f)) : [join(d, f)]));
 

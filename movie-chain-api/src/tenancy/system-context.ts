@@ -1,4 +1,4 @@
-import type { Actor, TenantContext } from './tenant-context';
+import { type Actor, announceTenant, type TenantContext } from './tenant-context';
 import { UUID_RE } from './tenant-db.provider';
 
 /**
@@ -12,5 +12,7 @@ import { UUID_RE } from './tenant-db.provider';
  */
 export function toSystemContext(resolvedFromResource: { tenantId: string }, actor: Actor): TenantContext {
   if (!UUID_RE.test(resolvedFromResource.tenantId)) throw new Error('resolved tenantId is not a uuid');
-  return { tenantId: resolvedFromResource.tenantId.toLowerCase(), actor };
+  const tenantId = resolvedFromResource.tenantId.toLowerCase();
+  announceTenant(tenantId);
+  return { tenantId, actor };
 }

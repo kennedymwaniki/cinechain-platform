@@ -16,11 +16,15 @@ import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { CONSUMER_ROUTE, IS_PUBLIC } from '../../src/auth/decorators';
 import { setupSwagger } from '../../src/common/swagger';
 import { HoldTokenService } from '../../src/inventory/hold-token.service';
+import { getQueueToken } from '@nestjs/bullmq';
+import { Module } from '@nestjs/common';
+import { EXPORT_QUEUE, ExportController, ExportService } from '../../src/reporting/export.processor';
+import { ReportingModule } from '../../src/reporting/reporting.module';
 import { asAdmin, TEST_PASSWORD } from '../support/seed';
 import { bootTestApp } from '../support/test-app';
 import { seedVenueTenant, type VenueTenant } from './helpers/seed-venue-tenant';
 
-type BTenant = VenueTenant & { filmId: string; ruleId: string; screeningId: string; holdToken: string };
+type BTenant = VenueTenant & { filmId: string; ruleId: string; screeningId: string; holdToken: string; exportId: string };
 type Probe = { params: (b: BTenant) => Record<string, string>; body?: (b: BTenant) => object };
 
 /** "METHOD /path" → how to aim it at tenant B. */
@@ -57,6 +61,7 @@ const PROBES: Record<string, Probe> = {
   // ids in the BODY are probed too
   // a code and a screening of tenant B's, scanned by tenant A's clerk
   'POST /tickets/redeem': { params: () => ({}), body: (b) => ({ code: 'AAAAAAAAAAAAAAAAAAAAAA', screening_id: b.screeningId, device_id: 'probe' }) },
+  'GET /reports/exports/:id': { params: (b) => ({ id: b.exportId }) },
   // a hold token signed for tenant B, presented by tenant A's clerk
   'POST /box-office/sales': { params: () => ({}), body: (b) => ({ hold_token: b.holdToken, tender_type: 'cash' }) },
   'POST /box-office/holds': { params: () => ({}), body: (b) => ({ screening_id: b.screeningId, seat_ids: [b.seatId] }) },
@@ -75,6 +80,9 @@ const NO_RESOURCE_IDS: Record<string, string> = {
   'GET /pricing-rules': 'list: asserted below to contain none of tenant B’s ids',
   'POST /pricing-rules': 'creates in the caller’s tenant; currency is the caller’s, set server-side',
   'GET /screenings': 'list: asserted below to contain none of tenant B’s ids (theatre_id filter probed in scheduling.spec)',
+  'GET /reports/occupancy': 'aggregate over the caller’s tenant; isolation and the theatre_id 404 asserted in reports.spec',
+  'GET /reports/revenue': 'aggregate over the caller’s tenant; asserted in reports.spec to exclude tenant B',
+  'POST /reports/exports': 'creates in the caller’s tenant',
 };
 
 const LISTS = ['GET /staff', 'GET /theatres', 'GET /films', 'GET /pricing-rules', 'GET /screenings'];
@@ -128,6 +136,9 @@ beforeAll(async () => {
     return {
     ...b,
     holdToken: '', // signed below, once the app (and its hold key) is up
+    exportId: (
+      await c.query(`INSERT INTO report_export (tenant_id, kind, from_at, to_at, requested_by) VALUES ($1, 'revenue', now() - interval '1 day', now(), gen_random_uuid()) RETURNING id`, [b.id])
+    ).rows[0].id,
     filmId,
     screeningId,
     ruleId: (
@@ -138,7 +149,14 @@ beforeAll(async () => {
     ).rows[0].id,
     };
   });
-  app = await bootTestApp(urls);
+  // The export routes, with the queue stubbed: a cross-tenant probe never reaches it.
+  @Module({
+    imports: [ReportingModule],
+    controllers: [ExportController],
+    providers: [ExportService, { provide: getQueueToken(EXPORT_QUEUE), useValue: { add: async () => undefined } }],
+  })
+  class ExportRoutes {}
+  app = await bootTestApp(urls, { modules: [ExportRoutes] });
   B.holdToken = await app.get(HoldTokenService).sign(
     { hold_id: crypto.randomUUID(), screening_id: B.screeningId, tenant_id: B.id, seat_ids: [B.seatId], quoted_total_minor: 1, currency: 'KES', channel: 'box_office' },
     new Date(Date.now() + 600_000),

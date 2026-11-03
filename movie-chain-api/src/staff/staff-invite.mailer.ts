@@ -18,6 +18,8 @@ export class StaffInviteMailer {
     // tenantSlug picks the chain's sign-in host; the token alone is useless without it.
     const link = `https://${tenantSlug}.${this.cfg.tenantBaseDomain}/activate?token=${token}`;
     this.outbox.set(email.toLowerCase(), token);
-    this.log.log(`activation link for ${email.replace(/^(.).*(@.*)$/, '$1***$2')} at ${tenantSlug}: ${link}`);
+    // The link is a bearer secret: logged only in local development, where it is how you activate.
+    if (this.cfg.env === 'development') this.log.log(`activation link (dev only): ${link}`);
+    else this.log.log('activation link issued');
   }
 }

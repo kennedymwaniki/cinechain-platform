@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { announceTenant } from './tenant-context';
 import { TenantDb, UUID_RE } from './tenant-db.provider';
 
 export interface ShowtimeRow {
@@ -50,6 +51,7 @@ export class Doors {
       'SELECT tenant_id FROM resolve_published_screening($1::uuid)',
       [screeningId],
     );
+    if (rows[0]) announceTenant(rows[0].tenant_id);
     return rows[0] ? { tenantId: rows[0].tenant_id } : null;
   }
 
@@ -59,6 +61,7 @@ export class Doors {
       'SELECT tenant_id, payment_id FROM resolve_payment_tenant($1, $2)',
       [provider, providerRef],
     );
+    if (rows[0]) announceTenant(rows[0].tenant_id);
     return rows[0] ? { tenantId: rows[0].tenant_id, paymentId: rows[0].payment_id } : null;
   }
 
@@ -85,6 +88,7 @@ export class Doors {
       [reference, email],
     );
     // Two chains with the same reference AND the same customer e-mail: refuse rather than guess.
+    if (rows.length === 1) announceTenant(rows[0]!.tenant_id);
     return rows.length === 1 ? { tenantId: rows[0]!.tenant_id, bookingId: rows[0]!.booking_id } : null;
   }
 

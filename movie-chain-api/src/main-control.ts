@@ -4,12 +4,14 @@ import { NestFactory } from '@nestjs/core';
 import { ConfigValidationError, loadConfig } from './config/app-config';
 import { ControlAppModule } from './control/control-app.module';
 import { setupControlSwagger } from './common/swagger';
+import { PinoLogger } from './observability/logger';
 
 /** The control plane: a separate process, on :3001, as cinechain_control. */
 async function bootstrap(): Promise<void> {
   const cfg = loadConfig();
   if (!cfg.db.controlUrl) throw new ConfigValidationError('Invalid environment configuration:\n  - CONTROL_DATABASE_URL: required for the control plane');
-  const app = await NestFactory.create(ControlAppModule, { logger: [cfg.logLevel, 'error', 'warn', 'fatal'] });
+  const app = await NestFactory.create(ControlAppModule, { bufferLogs: true });
+  app.useLogger(new PinoLogger({ level: cfg.logLevel, service: 'cinechain-control', file: cfg.logFile.control }));
   app.enableShutdownHooks();
   if (cfg.env !== 'production') setupControlSwagger(app);
   await app.listen(cfg.controlPort, '127.0.0.1'); // never exposed publicly

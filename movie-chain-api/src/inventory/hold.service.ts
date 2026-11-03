@@ -4,7 +4,7 @@ import { AuditLog } from '../audit/audit-log.service';
 import { PricingService } from '../catalogue/pricing.service';
 import { badRequest, conflict, notFound, unprocessable } from '../common/errors/api-error';
 import type { ScreenFormat, SeatClass } from '../db/schema/venue';
-import { Metrics } from '../metrics/metrics.service';
+import { Metrics } from '../observability/metrics.module';
 import { RedisHealthBreaker } from '../redis/redis-health.breaker';
 import { type Money, sum, toWire } from '../shared/money';
 import { Doors } from '../tenancy/doors';
@@ -80,6 +80,7 @@ export class HoldService {
   }
 
   async place(req: PlaceHold) {
+    const started = process.hrtime.bigint();
     const { ctx, screeningId, seatIds } = req;
     const tenant = await this.registry.byId(ctx.tenantId);
     if (!tenant) throw notFound();
@@ -170,6 +171,7 @@ export class HoldService {
       throw e;
     }
     this.metrics.inc('hold.placed', { tenant: ctx.tenantId, path: redisTook ? 'redis' : 'postgres' });
+    this.metrics.observe('hold.acquire_seconds', { tenant: ctx.tenantId, path: redisTook ? 'redis' : 'postgres' }, Number(process.hrtime.bigint() - started) / 1e9);
     await this.seatmaps.invalidate(ctx.tenantId, screeningId);
 
     const expiresAt = rows.reduce((min, r) => (r.expiresAt < min ? r.expiresAt : min), rows[0]!.expiresAt);

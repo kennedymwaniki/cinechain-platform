@@ -1,4 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { Metrics } from '../observability/metrics.module';
+import { ProbeTracker } from '../observability/probe-tracker';
 import { securityEvent } from '../db/schema/platform';
 import { IdentityDb } from '../tenancy/identity-db.provider';
 
@@ -25,9 +27,18 @@ export interface SecurityEventInput {
 export class SecurityEvents {
   private readonly log = new Logger(SecurityEvents.name);
 
-  constructor(private readonly identity: IdentityDb) {}
+  private readonly probes = new ProbeTracker();
+
+  constructor(
+    private readonly identity: IdentityDb,
+    @Optional() @Inject(Metrics) private readonly metrics: Metrics | null = null,
+  ) {}
 
   async record(kind: SecurityEventKind, e: SecurityEventInput = {}): Promise<void> {
+    if (this.metrics && (kind === 'tenant_mismatch' || kind === 'wrong_token_type')) {
+      const tenant = e.tenantId ?? 'none';
+      this.metrics.set('cross_tenant_attempts_max_per_actor', { tenant }, this.probes.record(tenant, e.actorSub ?? 'anonymous'));
+    }
     try {
       await this.identity.db.insert(securityEvent).values({
         kind,

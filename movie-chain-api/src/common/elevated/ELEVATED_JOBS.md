@@ -8,7 +8,7 @@ marked `@CrossTenantJob(reason)` in code and listed here.
 | Job | Since | Role | Reaches | Why it cannot be tenant-scoped |
 |---|---|---|---|---|
 | `SweeperProcessor` (`src/inventory/sweeper.processor.ts`) | step 15 | `cinechain_sweeper` (BYPASSRLS) | `SELECT` on five `seat_lock` columns, `DELETE` on `seat_lock`. Nothing else. | Expired holds exist in every tenant at once; one pass per tick across all of them is the point. A per-tenant fan-out would need a cross-tenant read to find the tenants anyway. |
-| *(step 24: the metering roll-up)* | — | — | — | — |
+| `MeteringAggregatorProcessor` (`src/metering/aggregator.processor.ts`) | step 24 | `cinechain_control` (no BYPASSRLS; **no grant** on `booking`, `ticket`, `payment`) | Redis `usage:{t:*}` counters, object-storage sizes under `t/<tenant>/`, the `tenant` registry; writes `platform.metering_usage` only. | Folds every tenant's counters in one pass. It reads no tenant table at all: it counts what the application plane already counted, so it cannot see a booking even by mistake. |
 
 ## Not elevated: registry fan-out
 

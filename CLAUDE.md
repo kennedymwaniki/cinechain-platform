@@ -86,6 +86,20 @@ From the booking core (steps 13–21):
 - Every `@Processor` takes `tenantId` in its payload; `test/isolation/worker-context.spec.ts`
   runs each one with only its payload. A new processor needs a probe there.
 
+From operations (steps 22–24):
+
+- **Reports run on their own pool** (`ReportingDb`) and their routes are `@DeferTenantTransaction`.
+  `TenantDb` refuses a scope nested inside another pool's scope.
+- **Never log a tenant at a call site.** The logger's mixin adds `tenant_id`; the tenancy layer
+  calls `announceTenant()` the moment the server learns it. Never log contact details or links
+  carrying secrets.
+- **Metrics take the real tenant id; `TenantLabels` decides the label** (top 50, the rest `other`).
+  Name counters `*_total` (prom-client does not add it).
+- **Metering never reads tenant tables.** The aggregator runs in the control plane, whose role has
+  no grant on booking/ticket/payment. Exactly two `@CrossTenantJob`s exist; that is final.
+- **Two Docker engines exist on this machine** (`docker context ls`: `default` and Docker
+  Desktop). The dev data lives on `default`. If Postgres looks empty, check the context first.
+
 The PRDs also still describe Keycloak and siloed databases. We use in-app Passport, and everything
 is pooled in one database for now.
 
@@ -111,6 +125,12 @@ npm run build                                 # all PDFs (the plan PDF is render
 
 Dev logins (password `cinechain-dev-password`): staff `chris@nyati.test` (tenant_slug `nyati`),
 operator `purity@cinechain.test`. Node is the installed v25; NestJS 12.
+
+Observability (optional profile): `docker compose --profile observability up -d` adds
+Prometheus (127.0.0.1:9090, scrapes both planes, loads `deploy/alerts/`), Loki (127.0.0.1:3100),
+Alloy (ships `logs/*.log`, from `LOG_FILE`/`LOG_FILE_CONTROL`) and Grafana on **127.0.0.1:3030**
+(`admin` / `cinechain-grafana`, dashboard "CineChain — overview"). Prometheus and Grafana use host
+networking (native engine): the metrics endpoints answer loopback only.
 
 Postgres is on **5434** and Redis on **6380**. Native Postgres clusters already hold 5432 *and* 5433,
 and a native Redis holds 6379. MinIO (S3-compatible, posters and exports) is on **9000**, with its

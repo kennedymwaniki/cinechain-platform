@@ -38,6 +38,9 @@ export class TenantMismatchError extends DomainError {
   }
 }
 
+/** A dependency is saturated or down; the client may retry. */
+export class UnavailableError extends DomainError {}
+
 /** Too many attempts: the enumeration-sensitive endpoints are rate-limited. */
 export class RateLimitedError extends DomainError {
   constructor(readonly retryAfterS: number) {
@@ -56,4 +59,5 @@ export const STATUS_BY_CLASS = new Map<abstract new (...args: never[]) => Domain
   [UnprocessableError, 422],
   [PaymentRequiredError, 402],
   [RateLimitedError, 429],
+  [UnavailableError, 503],
 ]);

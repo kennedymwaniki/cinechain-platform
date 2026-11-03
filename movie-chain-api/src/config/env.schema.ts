@@ -10,6 +10,9 @@ export const envSchema = z
     PORT: port.default(3000),
     CONTROL_PORT: port.default(3001),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'log', 'debug', 'verbose']).default('log'),
+    // Also append JSON log lines here (Alloy ships logs/*.log to Loki). Unset = stdout only.
+    LOG_FILE: optionalString,
+    LOG_FILE_CONTROL: optionalString,
     CORS_ORIGINS: z.string().default('http://localhost:5173'),
     APP_PUBLIC_URL: z.url().default('http://localhost:3000'),
     // Staff sign in at <slug>.<TENANT_BASE_DOMAIN>; without a subdomain they send tenant_slug.
@@ -18,6 +21,8 @@ export const envSchema = z
     // Application-plane connection. From step 2 this is the cinechain_app role.
     DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
     DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(200).default(20),
+    // Reporting's OWN pool (step 22), deliberately small: reports can never take booking's connections.
+    DATABASE_REPORTING_POOL_MAX: z.coerce.number().int().min(1).max(50).default(4),
     // The identity plane: the only role granted on platform.* (step 5).
     IDENTITY_DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
 
@@ -41,6 +46,10 @@ export const envSchema = z
     PAYMENT_WEBHOOK_SECRET_CARD: optionalString,
     // Ticket codes are HMAC(secret, ticket id). Rotating it invalidates every unredeemed ticket.
     TICKET_CODE_SECRET: optionalString,
+    // Bearer token for GET /api/v1/metrics from a non-loopback scraper. Unset = loopback only.
+    METRICS_TOKEN: optionalString,
+    // OTLP/HTTP traces endpoint (e.g. http://collector:4318/v1/traces). Unset = no export.
+    OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: z.preprocess((v) => (v === '' ? undefined : v), z.url().optional()),
 
     JWT_KEYS_DIR: z.string().min(1).default('./keys'),
     JWT_ISSUER: z.string().min(1).default('cinechain'),

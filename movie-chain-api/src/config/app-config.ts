@@ -5,14 +5,17 @@ export interface AppConfig {
   port: number;
   controlPort: number;
   logLevel: Env['LOG_LEVEL'];
+  logFile: { api: string | null; control: string | null };
   corsOrigins: string[];
   publicUrl: string;
   tenantBaseDomain: string;
-  db: { url: string; poolMax: number; identityUrl: string; controlUrl: string | null; sweeperUrl: string | null };
+  db: { url: string; poolMax: number; reportingPoolMax: number; identityUrl: string; controlUrl: string | null; sweeperUrl: string | null };
   onboarding: { attempts: number };
   redis: { url: string };
   payments: { mpesaWebhookSecret: string; cardWebhookSecret: string };
   tickets: { codeSecret: string };
+  metricsToken: string | null;
+  otlpTracesUrl: string | null;
   storage: { endpoint: string; region: string; accessKey: string; secretKey: string; bucket: string };
   auth: {
     keysDir: string;
@@ -51,12 +54,14 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     port: e.PORT,
     controlPort: e.CONTROL_PORT,
     logLevel: e.LOG_LEVEL,
+    logFile: { api: e.LOG_FILE ?? null, control: e.LOG_FILE_CONTROL ?? null },
     corsOrigins: e.CORS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean),
     publicUrl: e.APP_PUBLIC_URL,
     tenantBaseDomain: e.TENANT_BASE_DOMAIN,
     db: {
       url: e.DATABASE_URL,
       poolMax: e.DATABASE_POOL_MAX,
+      reportingPoolMax: e.DATABASE_REPORTING_POOL_MAX,
       identityUrl: e.IDENTITY_DATABASE_URL,
       controlUrl: e.CONTROL_DATABASE_URL ?? null,
       sweeperUrl: e.SWEEPER_DATABASE_URL ?? null,
@@ -69,6 +74,8 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
       cardWebhookSecret: e.PAYMENT_WEBHOOK_SECRET_CARD ?? 'dev-only-card-webhook-secret',
     },
     tickets: { codeSecret: e.TICKET_CODE_SECRET ?? 'dev-only-ticket-code-secret' },
+    metricsToken: e.METRICS_TOKEN ?? null,
+    otlpTracesUrl: e.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT ?? null,
     storage: {
       endpoint: e.S3_ENDPOINT,
       region: e.S3_REGION,

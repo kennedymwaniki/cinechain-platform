@@ -9,6 +9,7 @@
  * A new processor with no probe here fails the suite.
  */
 import type { INestApplication } from '@nestjs/common';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { ModulesContainer } from '@nestjs/core';
 import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
 import { afterAll, beforeAll, describe, expect, inject, it, vi } from 'vitest';
@@ -19,6 +20,7 @@ import { SweeperModule } from '../../src/inventory/sweeper.module';
 import { NotificationModule } from '../../src/notification/notification.module';
 import { QueueModule } from '../../src/queue/queue.module';
 import { RealtimeModule } from '../../src/realtime/realtime.module';
+import { ExportModule } from '../../src/reporting/export.module';
 import { maybeCurrentTenant } from '../../src/tenancy/tenant-context';
 import { TenantDb } from '../../src/tenancy/tenant-db.provider';
 import { asAdmin, createTenant } from '../support/seed';
@@ -34,6 +36,7 @@ const PROBES: Record<string, (tenantId: string) => { name: string; data: Record<
     name: 'expired',
     data: { tenantId, screeningId: crypto.randomUUID(), holdId: crypto.randomUUID(), seatIds: [], expiresAt: new Date().toISOString(), kind: 'expired' },
   }),
+  ExportProcessor: (tenantId) => ({ name: 'export', data: { tenantId, exportId: crypto.randomUUID() } }),
   // The registry fan-out's real work: one tenant's reconciliation.
   ReconciliationProcessor: (tenantId) => ({ name: 'reconcile', data: { tenantId } }),
 };
@@ -46,7 +49,7 @@ let tenantId: string;
 beforeAll(async () => {
   redis = await new GenericContainer('redis:7-alpine').withExposedPorts(6379).withWaitStrategy(Wait.forLogMessage('Ready to accept connections')).start();
   app = await bootTestApp(urls, {
-    modules: [QueueModule, RealtimeModule, NotificationModule, GuestLinkModule, ReconciliationModule, SweeperModule],
+    modules: [QueueModule, RealtimeModule, NotificationModule, GuestLinkModule, ReconciliationModule, SweeperModule, ExportModule],
     env: { REDIS_URL: `redis://${redis.getHost()}:${redis.getMappedPort(6379)}`, SWEEPER_DATABASE_URL: urls.sweeperUrl },
   });
   tenantId = await asAdmin(urls.adminUrl, async (c) => (await createTenant(c)).id);
@@ -81,19 +84,21 @@ describe('worker context', () => {
 
   it('no processor relies on ambient context: each opens a scope for exactly the tenant in its payload', async () => {
     const scopes: { processor: string; tenant: string | undefined }[] = [];
-    let current = '';
+    // Only scopes opened BY the probed call count: real background jobs (the reconciler's
+    // scheduled fan-out, say) open scopes for other tenants at the same time.
+    const probing = new AsyncLocalStorage<string>();
     const original = TenantDb.prototype.withTenantScope;
     const spy = vi.spyOn(TenantDb.prototype, 'withTenantScope').mockImplementation(function <T>(this: TenantDb, fn: () => Promise<T>) {
-      scopes.push({ processor: current, tenant: maybeCurrentTenant()?.tenantId });
+      const processor = probing.getStore();
+      if (processor) scopes.push({ processor, tenant: maybeCurrentTenant()?.tenantId });
       return original.call(this, fn) as Promise<T>;
     });
     try {
       for (const p of processors()) {
         const probe = PROBES[p.name];
         if (!probe) continue; // a reviewed @CrossTenantJob
-        current = p.name;
         expect(maybeCurrentTenant(), 'the test itself must hold no context').toBeUndefined();
-        await p.instance.process({ ...probe(tenantId), id: 'probe', attemptsMade: 0, opts: {} }).catch(() => undefined); // payload data may not exist; the scope is what matters
+        await probing.run(p.name, () => p.instance.process({ ...probe(tenantId), id: 'probe', attemptsMade: 0, opts: {} })).catch(() => undefined); // payload data may not exist; the scope is what matters
         const mine = scopes.filter((s) => s.processor === p.name);
         expect(mine.length, `${p.name} opened no tenant scope`).toBeGreaterThan(0);
         for (const s of mine) expect(s.tenant, `${p.name} opened a scope for the wrong tenant`).toBe(tenantId);

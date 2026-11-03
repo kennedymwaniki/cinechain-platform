@@ -6,11 +6,15 @@ import { CommonModule } from './common/common.module';
 import { ConfigModule } from './config/config.module';
 import { PublicDiscoveryModule } from './discovery/discovery.module';
 import { HealthModule } from './health/health.module';
-import { MetricsModule } from './metrics/metrics.service';
+import { ObservabilityModule } from './observability/observability.module';
 import { PaymentModule } from './payment/payment.module';
 import { BookingModule } from './booking/booking.module';
 import { TicketingModule } from './ticketing/ticketing.module';
 import { NotificationModule } from './notification/notification.module';
+import { ReportingModule } from './reporting/reporting.module';
+import { ExportModule } from './reporting/export.module';
+import { MeteringModule } from './metering/metering.module';
+import { BookingMeteringModule } from './metering/booking-metering.module';
 import { GuestLinkModule } from './booking/guest-link.module';
 import { ReconciliationModule } from './booking/reconciliation.module';
 import { InventoryModule } from './inventory/inventory.module';
@@ -32,7 +36,7 @@ import { VenueModule } from './venue/venue.module';
     AuditModule,
     CommonModule,
     RedisModule,
-    MetricsModule,
+    ObservabilityModule,
     QueueModule,
     StorageModule,
     AuthModule,
@@ -49,6 +53,10 @@ import { VenueModule } from './venue/venue.module';
     BookingModule,
     TicketingModule,
     NotificationModule,
+    ReportingModule,
+    ExportModule,
+    MeteringModule,
+    BookingMeteringModule,
     GuestLinkModule,
     ReconciliationModule,
     PublicDiscoveryModule,

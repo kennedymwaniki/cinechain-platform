@@ -5,3 +5,4 @@ coverage/
 keys/
 *.tsbuildinfo
 drizzle/
+logs/

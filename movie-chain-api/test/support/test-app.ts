@@ -13,10 +13,11 @@ import { AuditModule } from '../../src/audit/audit.module';
 import { AuthModule } from '../../src/auth/auth.module';
 import { CatalogueModule } from '../../src/catalogue/catalogue.module';
 import { PublicDiscoveryModule } from '../../src/discovery/discovery.module';
-import { MetricsModule } from '../../src/metrics/metrics.service';
+import { ObservabilityModule } from '../../src/observability/observability.module';
 import { PaymentModule } from '../../src/payment/payment.module';
 import { BookingModule } from '../../src/booking/booking.module';
 import { TicketingModule } from '../../src/ticketing/ticketing.module';
+import { ReportingModule } from '../../src/reporting/reporting.module';
 import { InventoryModule } from '../../src/inventory/inventory.module';
 import { RedisModule } from '../../src/redis/redis.module';
 import { SchedulingModule } from '../../src/scheduling/scheduling.module';
@@ -65,7 +66,7 @@ export async function bootTestApp(
   urls: { appUrl: string; identityUrl: string },
   opts: { modules?: Type[]; env?: Record<string, string>; websockets?: boolean } = {},
 ): Promise<INestApplication> {
-  @Module({ imports: [ConfigModule, TenancyModule, AuditModule, CommonModule, AuthModule, IdentityModule, StaffModule, VenueModule, CatalogueModule, SchedulingModule, InventoryModule, PublicDiscoveryModule, StorageModule, RedisModule, MetricsModule, PaymentModule, BookingModule, TicketingModule, ...(opts.modules ?? [])] })
+  @Module({ imports: [ConfigModule, TenancyModule, AuditModule, CommonModule, AuthModule, IdentityModule, StaffModule, VenueModule, CatalogueModule, SchedulingModule, InventoryModule, PublicDiscoveryModule, StorageModule, RedisModule, ObservabilityModule, PaymentModule, BookingModule, TicketingModule, ReportingModule, ...(opts.modules ?? [])] })
   class TestAppModule {}
 
   const ref = await Test.createTestingModule({ imports: [TestAppModule] })

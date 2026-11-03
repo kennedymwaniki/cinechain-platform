@@ -68,7 +68,9 @@ export class Reconciler {
 
     const pendingRefunds = await scope(() => this.refunds.stalePending(REFUND_RETRY_AFTER_MS));
     for (const r of pendingRefunds) await this.refunds.execute(ctx, r.id);
-    if (refunded || pendingRefunds.length) this.log.warn(`tenant ${tenantId}: refunded ${refunded} orphaned capture(s), retried ${pendingRefunds.length} refund(s)`);
+    // Inside the tenant's context, so the log line carries tenant_id without naming it here.
+    if (refunded || pendingRefunds.length)
+      await runWithTenant(ctx, async () => this.log.warn(`refunded ${refunded} orphaned capture(s), retried ${pendingRefunds.length} refund(s)`));
     return { orphansRefunded: refunded, refundsRetried: pendingRefunds.length };
   }
 

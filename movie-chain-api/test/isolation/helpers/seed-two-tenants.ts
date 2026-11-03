@@ -121,12 +121,21 @@ export async function seedTwoTenants(adminUrl: string): Promise<TwoTenants> {
           [t.id, `ev_${i}`, pay.rows[0]!.id],
         );
       }
+    for (const [t, n] of [
+      [A, 1],
+      [B, 2],
+    ] as const)
+      for (let i = 0; i < n; i++)
+        await c.query(
+          `INSERT INTO report_export (tenant_id, kind, from_at, to_at, requested_by) VALUES ($1, 'revenue', now() - interval '1 day', now(), gen_random_uuid())`,
+          [t.id],
+        );
     return {
       A,
       B,
       expected: {
-        A: { tenant_customer: 3, staff_user: 2, audit_event: 1, idempotency_key: 1, staff_activation: 1, theatre: 1, screen: 1, seat: 6, staff_theatre: 1, film: 1, pricing_rule: 1, screening: 1, seat_lock: 2, payment: 1, payment_refund: 1, payment_webhook_event: 1, booking: 1, ticket: 1, loyalty_ledger: 1, outbox_event: 1, admission_event: 1 },
-        B: { tenant_customer: 2, staff_user: 1, audit_event: 3, idempotency_key: 3, staff_activation: 1, theatre: 2, screen: 2, seat: 12, staff_theatre: 1, film: 2, pricing_rule: 2, screening: 2, seat_lock: 4, payment: 2, payment_refund: 2, payment_webhook_event: 2, booking: 2, ticket: 2, loyalty_ledger: 2, outbox_event: 2, admission_event: 2 },
+        A: { tenant_customer: 3, staff_user: 2, audit_event: 1, idempotency_key: 1, staff_activation: 1, theatre: 1, screen: 1, seat: 6, staff_theatre: 1, film: 1, pricing_rule: 1, screening: 1, seat_lock: 2, payment: 1, payment_refund: 1, payment_webhook_event: 1, booking: 1, ticket: 1, loyalty_ledger: 1, outbox_event: 1, admission_event: 1, report_export: 1 },
+        B: { tenant_customer: 2, staff_user: 1, audit_event: 3, idempotency_key: 3, staff_activation: 1, theatre: 2, screen: 2, seat: 12, staff_theatre: 1, film: 2, pricing_rule: 2, screening: 2, seat_lock: 4, payment: 2, payment_refund: 2, payment_webhook_event: 2, booking: 2, ticket: 2, loyalty_ledger: 2, outbox_event: 2, admission_event: 2, report_export: 2 },
       },
     };
   });

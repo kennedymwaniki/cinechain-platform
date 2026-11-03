@@ -13,3 +13,4 @@ export * from './inventory';
 export * from './payment';
 export * from './booking';
 export * from './admission';
+export * from './reporting';

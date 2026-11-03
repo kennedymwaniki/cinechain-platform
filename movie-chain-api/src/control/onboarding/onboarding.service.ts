@@ -168,7 +168,7 @@ export class OnboardingService implements OnApplicationBootstrap {
       for (const fn of after) await fn();
     }
     await this.setStatus(run.id, 'provisioning', 'active');
-    this.log.log(`tenant ${request.slug} (${job.tenantId}) is ACTIVE`);
+    await runWithTenant(toSystemContext({ tenantId: job.tenantId }, { kind: 'system', reason: 'onboarding' }), async () => this.log.log('onboarding run is ACTIVE'));
   }
 
   /** Deletes every recorded resource, newest first, then marks the run rolled back. */
