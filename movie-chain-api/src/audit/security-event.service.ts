@@ -35,6 +35,7 @@ export class SecurityEvents {
   ) {}
 
   async record(kind: SecurityEventKind, e: SecurityEventInput = {}): Promise<void> {
+    this.metrics?.inc('security.events_total', { kind });
     if (this.metrics && (kind === 'tenant_mismatch' || kind === 'wrong_token_type')) {
       const tenant = e.tenantId ?? 'none';
       this.metrics.set('cross_tenant_attempts_max_per_actor', { tenant }, this.probes.record(tenant, e.actorSub ?? 'anonymous'));

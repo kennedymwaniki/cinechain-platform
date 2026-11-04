@@ -1,0 +1,31 @@
+{
+  "at": "2026-11-04T18:01:32.157Z",
+  "params": {
+    "ramp": "10s",
+    "hold": "30s",
+    "k6_cpuset": "0,1",
+    "noisy_rps": 760,
+    "quiet_rps": 40,
+    "noisy_tier": "standard"
+  },
+  "quiet_p95_ms": {
+    "baseline": 66.9,
+    "with_blockbuster": 219.02,
+    "degradation_pct": 227.37
+  },
+  "hold_p99_ms": 361.23,
+  "requests": 28615,
+  "noisy_rate_limited": 25356,
+  "quiet_rate_limited": 0,
+  "server_errors": 0,
+  "holds_won": 449,
+  "double_sales": 0,
+  "k6_thresholds": {
+    "server_errors: count==0": true,
+    "quiet_rate_limited: count==0": true,
+    "http_req_duration{kind:hold}: p(99)<400": true,
+    "http_req_duration{side:quiet}: p(95)<80.28": false,
+    "noisy_rate_limited: count>0": true
+  },
+  "pass": false
+}

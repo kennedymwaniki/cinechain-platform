@@ -2,6 +2,7 @@
 import js from '@eslint/js';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
+import cinechain from './eslint-rules/no-tier-branching.mjs';
 
 // Convention 4: only src/tenancy/ may open database connections. Everything
 // else gets a handle from db(), which is always tenant-scoped.
@@ -50,7 +51,10 @@ export default tseslint.config(
   },
   {
     files: ['src/**/*.ts'],
+    plugins: { cinechain },
     rules: {
+      // Convention 6: no tier-name literals outside src/tiering/ (the rule itself exempts that folder).
+      'cinechain/no-tier-branching': 'error',
       'no-restricted-syntax': ['error', noProcessEnv, ...noFloatMoney],
       'no-restricted-imports': ['error', noRawDb],
     },

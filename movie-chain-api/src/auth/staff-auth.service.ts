@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { SecurityEvents } from '../audit/security-event.service';
 import { APP_CONFIG, type AppConfig } from '../config/app-config';
 import { staffUser, type StaffRole } from '../db/schema/staff-user';
+import { admitsDoorStaff } from '../tenancy/decorators';
 import { forbidden, unauthorized } from '../common/errors/api-error';
 import { db, runWithTenant } from '../tenancy/tenant-context';
 import { TenantDb } from '../tenancy/tenant-db.provider';
@@ -78,7 +79,9 @@ export class StaffAuthService {
       await this.security.record('login_failed', { tenantId: tenant?.id ?? null, detail: { tenantSlug } });
       throw unauthorized('invalid_credentials', 'E-mail or password is incorrect');
     }
-    if (tenant.status !== 'active') throw forbidden('tenant_suspended', 'This cinema chain is not currently active');
+    // A suspended chain admits box-office staff only, for scanning tickets already sold (step 27).
+    if (tenant.status !== 'active' && !admitsDoorStaff(tenant.status, row.role))
+      throw forbidden('tenant_suspended', 'This cinema chain is not currently active');
 
     await this.inTenant(tenant.id, 'staff-login', () =>
       db().update(staffUser).set({ lastLoginAt: new Date() }).where(eq(staffUser.id, row.id)),
@@ -117,7 +120,8 @@ export class StaffAuthService {
       await this.refresh.revokeFamily(subject.familyId);
       throw unauthorized('session_revoked', 'Session is no longer valid; sign in again');
     }
-    if (tenant.status !== 'active') throw forbidden('tenant_suspended', 'This cinema chain is not currently active');
+    if (tenant.status !== 'active' && !admitsDoorStaff(tenant.status, row.role))
+      throw forbidden('tenant_suspended', 'This cinema chain is not currently active');
 
     const principal: StaffPrincipal = { ...row, tenant };
     const refresh = await this.refresh.issue(

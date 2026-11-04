@@ -1,3 +1,4 @@
+import { RateLimitTenantFrom } from '../tiering/decorators';
 import { Controller, Get, Headers, Param, Req } from '@nestjs/common';
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 import { ConsumerRoute } from '../auth/decorators';
@@ -22,6 +23,7 @@ export class SeatmapController {
    */
   @ConsumerRoute()
   @ApiHeader({ name: HOLD_TOKEN_HEADER, required: false })
+  @RateLimitTenantFrom('screening')
   @Get('screenings/:id/seatmap')
   async seatmap(@Param('id', Uuid) id: string, @Req() req: ConsumerRequest, @Headers(HOLD_TOKEN_HEADER) holdToken?: string) {
     const holdId = holdToken ? (await this.tokens.verify(holdToken, { screeningId: id })).hold_id : null;

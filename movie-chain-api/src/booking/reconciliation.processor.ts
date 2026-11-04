@@ -11,6 +11,7 @@ import { toSystemContext } from '../tenancy/system-context';
 import { db, runWithTenant, type TenantContext } from '../tenancy/tenant-context';
 import { TenantDb } from '../tenancy/tenant-db.provider';
 import { RefundService } from './refund.service';
+import { Metrics } from '../observability/metrics.module';
 
 export const RECONCILE_QUEUE = 'booking.reconcile';
 export const RECONCILE_EVERY_MS = 60_000;
@@ -39,6 +40,7 @@ export class Reconciler {
     private readonly refunds: RefundService,
     private readonly payments: PaymentRepository,
     private readonly providers: PaymentProviders,
+    private readonly metrics: Metrics,
   ) {}
 
   async reconcile(tenantId: string, now = Date.now()) {
@@ -60,6 +62,7 @@ export class Reconciler {
       if (status === 'captured') {
         // Crash after capture: the customer has paid for seats they do not have.
         await this.refunds.refundSeatsLost(ctx, s.bookingId, 'orphaned_capture');
+        this.metrics.inc('reconciliation.actions_total', { tenant: ctx.tenantId, action: 'orphan_refunded' });
         refunded++;
       } else if (status === 'failed') {
         await scope(() => db().update(booking).set({ status: 'expired', failureReason: 'payment_failed' }).where(and(eq(booking.id, s.bookingId), eq(booking.status, 'pending'))));
@@ -68,6 +71,8 @@ export class Reconciler {
 
     const pendingRefunds = await scope(() => this.refunds.stalePending(REFUND_RETRY_AFTER_MS));
     for (const r of pendingRefunds) await this.refunds.execute(ctx, r.id);
+    if (pendingRefunds.length) this.metrics.inc('reconciliation.actions_total', { tenant: ctx.tenantId, action: 'refund_retried' }, pendingRefunds.length);
+    this.metrics.inc('reconciliation.runs_total', { tenant: ctx.tenantId });
     // Inside the tenant's context, so the log line carries tenant_id without naming it here.
     if (refunded || pendingRefunds.length)
       await runWithTenant(ctx, async () => this.log.warn(`refunded ${refunded} orphaned capture(s), retried ${pendingRefunds.length} refund(s)`));

@@ -9,6 +9,8 @@ import { Doors } from '../tenancy/doors';
 import { toSystemContext } from '../tenancy/system-context';
 import { db, runWithTenant } from '../tenancy/tenant-context';
 import { TenantDb } from '../tenancy/tenant-db.provider';
+import { Metrics } from '../observability/metrics.module';
+import { TenantJobGate } from '../lifecycle/tenant-job-gate';
 
 export const LINK_GUEST_QUEUE = 'identity.link-guest';
 
@@ -56,12 +58,18 @@ export class GuestLinkFanout implements OnApplicationBootstrap {
 /** The canonical worker shape: tenantId in the payload, runWithTenant first. Idempotent. */
 @Processor(LINK_GUEST_QUEUE)
 export class LinkGuestProcessor extends WorkerHost {
-  constructor(private readonly tenantDb: TenantDb) {
+  constructor(
+    private readonly tenantDb: TenantDb,
+    private readonly gate: TenantJobGate,
+    private readonly metrics: Metrics,
+  ) {
     super();
   }
 
-  async process(job: Job<LinkGuestJob>): Promise<{ customers: number; bookings: number }> {
+  async process(job: Job<LinkGuestJob>, token?: string): Promise<{ customers: number; bookings: number }> {
     const { tenantId, consumerId, email } = job.data;
+    // Paused while the chain is suspended; dropped once it is offboarded (step 27).
+    if ((await this.gate.check(job, token, tenantId)) === 'drop') return { customers: 0, bookings: 0 };
     return runWithTenant(toSystemContext({ tenantId }, { kind: 'system', reason: 'link guest history' }), () =>
       this.tenantDb.withTenantScope(async () => {
         const customers = await db()
@@ -74,6 +82,8 @@ export class LinkGuestProcessor extends WorkerHost {
           .set({ consumerId })
           .where(and(sql`${booking.guestEmail} = ${email}::citext`, isNull(booking.consumerId)))
           .returning({ id: booking.id });
+        this.metrics.inc('guest_link.bookings_linked_total', { tenant: tenantId }, bookings.length);
+        this.metrics.inc('guest_link.jobs_total', { tenant: tenantId });
         return { customers: customers.length, bookings: bookings.length };
       }),
     );

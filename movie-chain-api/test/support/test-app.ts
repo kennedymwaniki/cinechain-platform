@@ -18,6 +18,7 @@ import { PaymentModule } from '../../src/payment/payment.module';
 import { BookingModule } from '../../src/booking/booking.module';
 import { TicketingModule } from '../../src/ticketing/ticketing.module';
 import { ReportingModule } from '../../src/reporting/reporting.module';
+import { TieringModule } from '../../src/tiering/tiering.module';
 import { InventoryModule } from '../../src/inventory/inventory.module';
 import { RedisModule } from '../../src/redis/redis.module';
 import { SchedulingModule } from '../../src/scheduling/scheduling.module';
@@ -58,6 +59,8 @@ export function testConfig(urls: { appUrl: string; identityUrl: string }, extra:
     S3_BUCKET: 'unused',
     JWT_KEYS_DIR: testKeysDir(),
     LOG_LEVEL: 'error',
+    // Tests about rate limits set their own; everything else must not be throttled by the test runner's one address.
+    RATE_LIMIT_PER_ADDRESS_RPS: '100000',
     ...extra,
   });
 }
@@ -66,7 +69,7 @@ export async function bootTestApp(
   urls: { appUrl: string; identityUrl: string },
   opts: { modules?: Type[]; env?: Record<string, string>; websockets?: boolean } = {},
 ): Promise<INestApplication> {
-  @Module({ imports: [ConfigModule, TenancyModule, AuditModule, CommonModule, AuthModule, IdentityModule, StaffModule, VenueModule, CatalogueModule, SchedulingModule, InventoryModule, PublicDiscoveryModule, StorageModule, RedisModule, ObservabilityModule, PaymentModule, BookingModule, TicketingModule, ReportingModule, ...(opts.modules ?? [])] })
+  @Module({ imports: [ConfigModule, TenancyModule, AuditModule, CommonModule, AuthModule, IdentityModule, StaffModule, VenueModule, CatalogueModule, SchedulingModule, InventoryModule, PublicDiscoveryModule, StorageModule, RedisModule, ObservabilityModule, PaymentModule, BookingModule, TicketingModule, ReportingModule, TieringModule, ...(opts.modules ?? [])] })
   class TestAppModule {}
 
   const ref = await Test.createTestingModule({ imports: [TestAppModule] })

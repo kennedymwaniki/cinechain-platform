@@ -96,6 +96,8 @@ export class RefundService {
       return row ?? r;
     });
     if (result.status === 'failed') this.log.error(`PAGE: refund ${r.id} (booking ${p.bookingId}) failed at the provider: ${result.reason}`);
+    this.metrics.inc('refund.total', { tenant: ctx.tenantId, reason: r.reason, status: done.status });
+    if (done.status === 'succeeded') this.metrics.inc('refund.amount_minor_total', { tenant: ctx.tenantId, currency: r.currency, reason: r.reason }, r.amountMinor);
     return view(done);
   }
 

@@ -13,6 +13,17 @@ import { ControlHealthController } from './control-health.controller';
 import { ControlMetricsController } from './control-metrics.controller';
 import { METERING_QUEUE, MeteringAggregator, MeteringAggregatorProcessor } from '../metering/aggregator.processor';
 import { MeteringController } from './metering.controller';
+import { TiersController } from './tiers.controller';
+import { BillingController } from './billing/billing.controller';
+import { BILLING_QUEUE, BillingProcessor } from './billing/billing.processor';
+import { CostAllocator } from './billing/cost-allocator.service';
+import { DunningService, SubscriptionBillingGateway } from './billing/dunning.service';
+import { InvoiceGenerator } from './billing/invoice.generator';
+import { DeletionReportSigner } from './offboarding/deletion-report';
+import { DeletionService } from './offboarding/deletion.service';
+import { LifecycleController, OFFBOARDING_QUEUE, OffboardingTickProcessor } from './offboarding/lifecycle.controller';
+import { OffboardWorkflow } from './offboarding/offboard.workflow';
+import { LIFECYCLE_QUEUE } from '../lifecycle/lifecycle.processor';
 import { MeteringRepository } from '../metering/metering.repository';
 import { registerProducerQueue } from '../queue/queue.module';
 import { StorageModule } from '../storage/storage.module';
@@ -35,6 +46,9 @@ import { StaffInviteMailer } from '../staff/staff-invite.mailer';
     TokensModule,
     StorageModule,
     registerProducerQueue(METERING_QUEUE),
+    registerProducerQueue(BILLING_QUEUE),
+    registerProducerQueue(OFFBOARDING_QUEUE),
+    registerProducerQueue(LIFECYCLE_QUEUE), // consumed by the APPLICATION plane
     BullModule.registerQueueAsync({
       name: ONBOARDING_QUEUE,
       inject: [APP_CONFIG],
@@ -43,7 +57,7 @@ import { StaffInviteMailer } from '../staff/staff-invite.mailer';
       }),
     }),
   ],
-  controllers: [OperatorAuthController, OnboardingController, ControlHealthController, ControlMetricsController, MeteringController],
+  controllers: [OperatorAuthController, OnboardingController, ControlHealthController, ControlMetricsController, MeteringController, TiersController, BillingController, LifecycleController],
   providers: [
     CONTROL_DB_PROVIDER,
     OnboardingService,
@@ -52,6 +66,16 @@ import { StaffInviteMailer } from '../staff/staff-invite.mailer';
     MeteringRepository,
     MeteringAggregator,
     MeteringAggregatorProcessor,
+    InvoiceGenerator,
+    CostAllocator,
+    DunningService,
+    // The platform's own billing account: a separate instance from any ticket provider.
+    { provide: SubscriptionBillingGateway, useValue: new SubscriptionBillingGateway() },
+    BillingProcessor,
+    OffboardWorkflow,
+    DeletionService,
+    DeletionReportSigner,
+    OffboardingTickProcessor,
     { provide: APP_GUARD, useClass: OperatorGuard },
     { provide: APP_PIPE, useClass: ZodValidationPipe },
     { provide: APP_FILTER, useClass: ControlExceptionsFilter },

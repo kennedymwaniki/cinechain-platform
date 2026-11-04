@@ -15,6 +15,8 @@ const ALLOWED: Record<string, string[]> = {
   staff_user: ['DELETE', 'INSERT', 'SELECT'],
   tenant: ['DELETE', 'INSERT', 'SELECT', 'UPDATE'],
   theatre: ['DELETE', 'INSERT', 'SELECT'],
+  // step 25: operators manage the tier CATALOGUE (product configuration, no tenant data)
+  tier: ['INSERT', 'SELECT', 'UPDATE'],
 };
 
 describe('control-plane grants', () => {

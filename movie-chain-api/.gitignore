@@ -6,3 +6,4 @@ keys/
 *.tsbuildinfo
 drizzle/
 logs/
+test/load/fixtures/

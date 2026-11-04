@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { AuditLog } from '../audit/audit-log.service';
+import { DomainError } from '../common/errors/domain-errors';
 import { PricingService } from '../catalogue/pricing.service';
 import { badRequest, conflict, notFound, unprocessable } from '../common/errors/api-error';
 import type { ScreenFormat, SeatClass } from '../db/schema/venue';
@@ -13,6 +14,7 @@ import { type Actor, runWithTenant, type TenantContext } from '../tenancy/tenant
 import { TenantDb } from '../tenancy/tenant-db.provider';
 import { TenantRegistry } from '../tenancy/tenant-registry.service';
 import { HoldRepository } from './hold.repository';
+import { TierConfig } from '../tiering/tier-config.service';
 import { InventoryEvents } from './inventory-events';
 import { HoldTokenService } from './hold-token.service';
 import { RedisLocks } from './redis-locks';
@@ -61,6 +63,7 @@ export class HoldService {
     private readonly metrics: Metrics,
     private readonly audit: AuditLog,
     private readonly events: InventoryEvents,
+    private readonly tiers: TierConfig,
   ) {}
 
   /** A guest or consumer: the tenant comes from the screening, through the sanctioned door. */
@@ -73,21 +76,33 @@ export class HoldService {
       ctx: toSystemContext(owner, actor),
       screeningId,
       seatIds,
-      ttlSeconds: clampHoldSeconds(tenant.holdSeconds),
+      // The chain's own window, inside its tier's bounds (step 25), inside the platform's 120–900.
+      ttlSeconds: clampHoldSeconds(this.tiers.holdSeconds((await this.tiers.limitsFor(owner.tenantId))!, tenant.holdSeconds)),
       channel: 'online',
       heldByStaff: null,
     });
   }
 
+  /** Every refusal is counted by its reason (seats taken, seat gap, too many…): contention, made visible. */
   async place(req: PlaceHold) {
+    try {
+      return await this.placeInner(req);
+    } catch (e) {
+      if (e instanceof DomainError) this.metrics.inc('hold.refused_total', { tenant: req.ctx.tenantId, reason: e.code, channel: req.channel });
+      throw e;
+    }
+  }
+
+  private async placeInner(req: PlaceHold) {
     const started = process.hrtime.bigint();
     const { ctx, screeningId, seatIds } = req;
     const tenant = await this.registry.byId(ctx.tenantId);
     if (!tenant) throw notFound();
     if (new Set(seatIds).size !== seatIds.length) throw badRequest('duplicate_seats', 'Each seat may appear only once');
-    if (seatIds.length > tenant.maxSeatsPerBooking)
-      throw unprocessable('too_many_seats', `At most ${tenant.maxSeatsPerBooking} seats per booking`, {
-        max_seats: tenant.maxSeatsPerBooking,
+    const maxSeats = (await this.tiers.limitsFor(ctx.tenantId))?.maxSeatsPerBooking ?? tenant.maxSeatsPerBooking;
+    if (seatIds.length > maxSeats)
+      throw unprocessable('too_many_seats', `At most ${maxSeats} seats per booking`, {
+        max_seats: maxSeats,
       });
 
     // The seat map as it was a moment ago (≤ 5 s). Good enough for the
@@ -229,6 +244,7 @@ export class HoldService {
       this.locks.release({ tenantId: c.tenant_id, screeningId: c.screening_id, holdId, seatIds: c.seat_ids }),
     );
     await this.seatmaps.invalidate(c.tenant_id, c.screening_id);
+    this.metrics.inc('hold.released_total', { tenant: c.tenant_id }, freed.length);
     if (freed.length) {
       const version = r.ok && r.value.released > 0 ? r.value.version : await this.bumpVersion(c.tenant_id, c.screening_id);
       await this.events.emit({ kind: 'hold.released', tenantId: c.tenant_id, screeningId: c.screening_id, holdId, seatIds: freed, version });
@@ -254,6 +270,7 @@ export class HoldService {
       }),
     );
     await this.breaker.attempt(() => this.locks.extend(ref, expiresAt.getTime() - now.getTime()));
+    this.metrics.inc('hold.extended_total', { tenant: c.tenant_id });
     await this.events.emit({ kind: 'hold.extended', tenantId: c.tenant_id, screeningId: c.screening_id, holdId, seatIds: c.seat_ids, expiresAt });
     const { typ: _typ, ...claims } = c;
     return {

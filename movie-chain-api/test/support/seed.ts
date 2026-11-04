@@ -19,7 +19,8 @@ export async function asAdmin<T>(adminUrl: string, fn: (c: Client) => Promise<T>
 
 export async function createTenant(c: Client, slug = `t-${randomUUID().slice(0, 8)}`): Promise<SeededTenant> {
   const { rows } = await c.query<{ id: string }>(
-    `INSERT INTO tenant (slug, name, status) VALUES ($1, $1, 'active') RETURNING id`,
+    // The largest tier and a high negotiated rate: tests that are not ABOUT plans must not hit plan limits.
+    `INSERT INTO tenant (slug, name, status, tier, rate_limit_rps) VALUES ($1, $1, 'active', 'dedicated', 100000) RETURNING id`,
     [slug],
   );
   return { id: rows[0]!.id, slug };

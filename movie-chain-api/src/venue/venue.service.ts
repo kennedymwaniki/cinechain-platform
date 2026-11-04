@@ -1,3 +1,6 @@
+import { TierConfig } from '../tiering/tier-config.service';
+import { currentTenant } from '../tenancy/tenant-context';
+import { unprocessable } from '../common/errors/api-error';
 import { Injectable } from '@nestjs/common';
 import { AuditLog } from '../audit/audit-log.service';
 import { badRequest, conflict, notFound } from '../common/errors/api-error';
@@ -46,10 +49,17 @@ export class VenueService {
     private readonly scope: TheatreScope,
     private readonly layoutPolicy: ScreenLayoutPolicy,
     private readonly audit: AuditLog,
+    private readonly tiers: TierConfig,
   ) {}
 
   // ------------------------------------------------------------- theatres
   async createTheatre(v: Parameters<VenueRepository['insertTheatre']>[0]) {
+    // The plan's theatre allowance, read from configuration (step 25). Counted under RLS: this chain's only.
+    const limits = await this.tiers.limitsFor(currentTenant().tenantId);
+    if (limits && (await this.repo.countTheatres()) >= limits.maxTheatres)
+      throw unprocessable('tier_limit_reached', `The ${limits.tierName} plan includes ${limits.maxTheatres} theatre(s)`, {
+        limit: { name: 'max_theatres', tier: limits.tier, value: limits.maxTheatres },
+      });
     const t = await this.repo.insertTheatre(v);
     await this.audit.record('theatre.created', 'theatre', t.id, { name: t.name });
     return theatreView(t);

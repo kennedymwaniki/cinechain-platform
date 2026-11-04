@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool, type PoolClient, type PoolConfig } from 'pg';
 import { APP_CONFIG, type AppConfig } from '../config/app-config';
 import * as appSchema from '../db/schema/app';
-import { currentTenant, internal, type DbScope } from './tenant-context';
+import { currentTenant, internal, type DbScope, type TenantDrizzle } from './tenant-context';
 
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -44,6 +44,11 @@ export class TenantDb implements OnApplicationShutdown {
     this.pool.on('error', (e) => this.log.warn(`idle client error: ${e.message}`));
   }
 
+  /** Connection counts, for the pool gauges (no tenant data). */
+  poolStats(): { size: number; idle: number; waiting: number } {
+    return { size: this.pool.totalCount, idle: this.pool.idleCount, waiting: this.pool.waitingCount };
+  }
+
   async withTenantScope<T>(fn: () => Promise<T>): Promise<T> {
     const ctx = currentTenant();
     const existing = internal.dbAls.getStore();
@@ -64,7 +69,7 @@ export class TenantDb implements OnApplicationShutdown {
       // parameters, and interpolating instead is a SQL-injection sink.
       // is_local = true reverts the setting at COMMIT/ROLLBACK.
       await client.query(`SELECT set_config('app.tenant_id', $1, true)`, [ctx.tenantId]);
-      const scope: DbScope = { tenantId: ctx.tenantId, client, db: drizzle({ client, schema: appSchema }), owner: this, depth: 0 };
+      const scope: DbScope = { tenantId: ctx.tenantId, client, db: this.drizzleFor(client), owner: this, depth: 0 };
       const result = await internal.dbAls.run(scope, fn);
       await client.query('COMMIT');
       return result;
@@ -78,6 +83,21 @@ export class TenantDb implements OnApplicationShutdown {
     } finally {
       client.release(broken);
     }
+  }
+
+  /**
+   * One Drizzle wrapper per pooled connection, built once: constructing it walks
+   * the whole schema (relational config), which showed up in the load profile
+   * on every transaction. The wrapper holds no state beyond the client.
+   */
+  private readonly drizzles = new WeakMap<PoolClient, TenantDrizzle>();
+  private drizzleFor(client: PoolClient): TenantDrizzle {
+    let d = this.drizzles.get(client);
+    if (!d) {
+      d = drizzle({ client, schema: appSchema });
+      this.drizzles.set(client, d);
+    }
+    return d;
   }
 
   private async withSavepoint<T>(scope: DbScope, fn: () => Promise<T>): Promise<T> {

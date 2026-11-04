@@ -1,3 +1,4 @@
+import { RateLimitTenantFrom } from '../tiering/decorators';
 import { Body, Controller, Get, Headers, HttpCode, Param, Post, Query, Req, Res } from '@nestjs/common';
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
@@ -61,6 +62,7 @@ export class BookingController {
   @ConsumerRoute()
   @DeferTenantTransaction()
   @ApiHeader({ name: BOOKING_TOKEN_HEADER, required: false })
+  @RateLimitTenantFrom('booking_token')
   @Get('bookings/lookup')
   async lookup(@Query() q: BookingLookupQuery, @Headers(BOOKING_TOKEN_HEADER) token: string | undefined, @Req() req: ConsumerRequest) {
     await this.limiter.consume(`lookup:${req.ip ?? 'unknown'}`, 20, 60);
@@ -85,6 +87,7 @@ export class BookingController {
   @ConsumerRoute()
   @DeferTenantTransaction()
   @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @RateLimitTenantFrom('hold_token')
   @Post('bookings')
   async create(
     @Body() body: CreateBookingDto,
@@ -117,6 +120,7 @@ export class BookingController {
   @ConsumerRoute()
   @DeferTenantTransaction()
   @ApiHeader({ name: BOOKING_TOKEN_HEADER, required: true })
+  @RateLimitTenantFrom('booking_token')
   @Post('bookings/:id/cancel')
   cancel(@Param('id', Uuid) id: string, @Body() body: CancelBookingDto, @Headers(BOOKING_TOKEN_HEADER) token: string | undefined, @Req() req: ConsumerRequest) {
     return this.cancellations.cancelBooking(id, token, body.seat_ids, actorOf(req));

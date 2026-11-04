@@ -21,6 +21,7 @@ import { NotificationModule } from '../../src/notification/notification.module';
 import { QueueModule } from '../../src/queue/queue.module';
 import { RealtimeModule } from '../../src/realtime/realtime.module';
 import { ExportModule } from '../../src/reporting/export.module';
+import { LifecycleModule } from '../../src/lifecycle/lifecycle.module';
 import { maybeCurrentTenant } from '../../src/tenancy/tenant-context';
 import { TenantDb } from '../../src/tenancy/tenant-db.provider';
 import { asAdmin, createTenant } from '../support/seed';
@@ -36,6 +37,7 @@ const PROBES: Record<string, (tenantId: string) => { name: string; data: Record<
     name: 'expired',
     data: { tenantId, screeningId: crypto.randomUUID(), holdId: crypto.randomUUID(), seatIds: [], expiresAt: new Date().toISOString(), kind: 'expired' },
   }),
+  LifecycleProcessor: (tenantId) => ({ name: 'counts', data: { tenantId, action: 'counts' } }),
   ExportProcessor: (tenantId) => ({ name: 'export', data: { tenantId, exportId: crypto.randomUUID() } }),
   // The registry fan-out's real work: one tenant's reconciliation.
   ReconciliationProcessor: (tenantId) => ({ name: 'reconcile', data: { tenantId } }),
@@ -49,7 +51,7 @@ let tenantId: string;
 beforeAll(async () => {
   redis = await new GenericContainer('redis:7-alpine').withExposedPorts(6379).withWaitStrategy(Wait.forLogMessage('Ready to accept connections')).start();
   app = await bootTestApp(urls, {
-    modules: [QueueModule, RealtimeModule, NotificationModule, GuestLinkModule, ReconciliationModule, SweeperModule, ExportModule],
+    modules: [QueueModule, RealtimeModule, NotificationModule, GuestLinkModule, ReconciliationModule, SweeperModule, ExportModule, LifecycleModule],
     env: { REDIS_URL: `redis://${redis.getHost()}:${redis.getMappedPort(6379)}`, SWEEPER_DATABASE_URL: urls.sweeperUrl },
   });
   tenantId = await asAdmin(urls.adminUrl, async (c) => (await createTenant(c)).id);

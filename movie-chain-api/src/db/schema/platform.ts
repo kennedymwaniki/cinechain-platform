@@ -96,3 +96,19 @@ export const meteringUsage = platform.table(
   },
   (t) => [primaryKey({ columns: [t.tenantId, t.period] })],
 );
+
+/** Step 27. The offboarding workflow, one row per tenant. */
+export const offboardingRun = platform.table('offboarding_run', {
+  tenantId: uuid('tenant_id').primaryKey(),
+  status: text('status', { enum: ['offboarding', 'exported', 'deleted'] }).notNull().default('offboarding'),
+  requestedBy: uuid('requested_by').notNull(),
+  requestedAt: timestamp('requested_at', { withTimezone: true }).notNull().defaultNow(),
+  deadlineAt: timestamp('deadline_at', { withTimezone: true }).notNull(),
+  exportManifest: jsonb('export_manifest'),
+  exportVerifiedAt: timestamp('export_verified_at', { withTimezone: true }),
+  report: jsonb('report'),
+  reportSignature: text('report_signature'),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  lastError: text('last_error'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});

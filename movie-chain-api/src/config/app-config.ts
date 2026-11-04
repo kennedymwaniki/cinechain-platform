@@ -15,6 +15,7 @@ export interface AppConfig {
   payments: { mpesaWebhookSecret: string; cardWebhookSecret: string };
   tickets: { codeSecret: string };
   metricsToken: string | null;
+  rateLimit: { perAddressRps: number };
   otlpTracesUrl: string | null;
   storage: { endpoint: string; region: string; accessKey: string; secretKey: string; bucket: string };
   auth: {
@@ -75,6 +76,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     },
     tickets: { codeSecret: e.TICKET_CODE_SECRET ?? 'dev-only-ticket-code-secret' },
     metricsToken: e.METRICS_TOKEN ?? null,
+    rateLimit: { perAddressRps: e.RATE_LIMIT_PER_ADDRESS_RPS },
     otlpTracesUrl: e.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT ?? null,
     storage: {
       endpoint: e.S3_ENDPOINT,

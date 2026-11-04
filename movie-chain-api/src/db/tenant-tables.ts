@@ -36,7 +36,11 @@ export type TenantTable = (typeof TENANT_TABLES)[number];
  * Tables in `public` deliberately WITHOUT row-level security. This list is
  * complete; extending it is a reviewed change to the schema-guard test.
  */
-export const RLS_EXEMPT_TABLES = ["tenant", "drizzle_migrations"] as const;
+export const RLS_EXEMPT_TABLES = [
+  "tenant", // the registry
+  "tier", // step 25: global product configuration (limits per tier); no tenant data
+  "drizzle_migrations",
+] as const;
 
 /**
  * The sanctioned cross-tenant read doors (SECURITY DEFINER functions owned

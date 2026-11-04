@@ -48,6 +48,8 @@ export const envSchema = z
     TICKET_CODE_SECRET: optionalString,
     // Bearer token for GET /api/v1/metrics from a non-loopback scraper. Unset = loopback only.
     METRICS_TOKEN: optionalString,
+    // Requests per second from one client address, on routes with no tenant (sign-in, discovery).
+    RATE_LIMIT_PER_ADDRESS_RPS: z.coerce.number().int().min(1).max(100000).default(50),
     // OTLP/HTTP traces endpoint (e.g. http://collector:4318/v1/traces). Unset = no export.
     OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: z.preprocess((v) => (v === '' ? undefined : v), z.url().optional()),
 

@@ -43,8 +43,14 @@ export class UnavailableError extends DomainError {}
 
 /** Too many attempts: the enumeration-sensitive endpoints are rate-limited. */
 export class RateLimitedError extends DomainError {
-  constructor(readonly retryAfterS: number) {
-    super('rate_limited', 'Too many requests; try again shortly', { retry_after_s: retryAfterS });
+  constructor(
+    readonly retryAfterS: number,
+    detail: { message?: string; limit?: Record<string, unknown> } = {},
+  ) {
+    super('rate_limited', detail.message ?? 'Too many requests; try again shortly', {
+      retry_after_s: retryAfterS,
+      ...(detail.limit ? { limit: detail.limit } : {}),
+    });
   }
 }
 

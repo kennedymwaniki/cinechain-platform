@@ -1,3 +1,4 @@
+import { SkipRateLimit } from '../tiering/decorators';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
 import type { Response } from 'express';
@@ -29,6 +30,7 @@ export class HealthController {
   ) {}
 
   /** Reaches every datastore for real. 503 names whichever one failed. */
+  @SkipRateLimit()
   @Public()
   @Get()
   async check(@Res({ passthrough: true }) res: Response) {

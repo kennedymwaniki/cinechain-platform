@@ -85,3 +85,42 @@ jobs:
           cache-dependency-path: movie-chain-api/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:e2e
+
+  # Step 25: the blockbuster load test, archived as the performance baseline.
+  # It ARCHIVES rather than gates: on shared runners a latency gate fails on
+  # runner noise as often as on regressions. Compare latest.json across runs.
+  load:
+    if: github.ref == 'refs/heads/main'
+    needs: [e2e, isolation]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: movie-chain-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { package_json_file: movie-chain-api/package.json }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 25
+          cache: pnpm
+          cache-dependency-path: movie-chain-api/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: cp .env.example .env && docker compose up -d --wait
+      - run: pnpm keys:gen && pnpm db:migrate && pnpm build
+      - name: start the API
+        run: |
+          NODE_ENV=production LOG_FILE= \
+          PAYMENT_WEBHOOK_SECRET_MPESA=ci-load-webhook-secret-mpesa-000000000 \
+          PAYMENT_WEBHOOK_SECRET_CARD=ci-load-webhook-secret-card-0000000000 \
+          TICKET_CODE_SECRET=ci-load-ticket-code-secret-00000000000000 \
+          nohup node dist/main.js > api.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf localhost:3000/api/v1/health && break; sleep 1; done
+      - run: RAMP=10s HOLD=60s pnpm load:blockbuster
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blockbuster-baseline
+          path: movie-chain-api/test/load/results/

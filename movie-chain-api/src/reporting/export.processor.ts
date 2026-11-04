@@ -15,6 +15,8 @@ import { CreateExportDto } from './dto';
 import { DeferTenantTransaction } from '../tenancy/decorators';
 import { ReportingService } from './reporting.service';
 import { ReportingRepository } from './reporting.repository';
+import { Metrics } from '../observability/metrics.module';
+import { TenantJobGate } from '../lifecycle/tenant-job-gate';
 
 export const EXPORT_QUEUE = 'reporting.export';
 export const EXPORT_LINK_TTL_S = 300;
@@ -67,6 +69,8 @@ export class ExportProcessor extends WorkerHost implements BeforeApplicationShut
     private readonly reports: ReportingService,
     private readonly repo: ReportingRepository,
     private readonly storage: StorageService,
+    private readonly gate: TenantJobGate,
+    private readonly metrics: Metrics,
   ) {
     super();
   }
@@ -75,8 +79,10 @@ export class ExportProcessor extends WorkerHost implements BeforeApplicationShut
     await this.worker.close(true).catch(() => undefined);
   }
 
-  async process(job: Job<ExportJob>): Promise<string> {
+  async process(job: Job<ExportJob>, token?: string): Promise<string> {
     const { tenantId, exportId } = job.data;
+    // Paused while the chain is suspended; dropped once it is offboarded (step 27).
+    if ((await this.gate.check(job, token, tenantId)) === 'drop') return 'tenant offboarded';
     return runWithTenant(toSystemContext({ tenantId }, { kind: 'system', reason: 'report export' }), async () => {
       const row = await this.reports.run(async () => (await db().select().from(reportExport).where(eq(reportExport.id, exportId)))[0]);
       if (!row || row.status !== 'pending') return 'nothing to do';
@@ -105,10 +111,14 @@ export class ExportProcessor extends WorkerHost implements BeforeApplicationShut
             .set({ status: 'ready', objectKey: key, rows, completedAt: new Date() })
             .where(and(eq(reportExport.id, exportId), eq(reportExport.status, 'pending'))),
         );
+        this.metrics.inc('report.exports_total', { tenant: tenantId, kind: row.kind, outcome: 'ready' });
+        this.metrics.inc('report.export_rows_total', { tenant: tenantId, kind: row.kind }, rows);
         return 'ready';
       } catch (e) {
-        if (job.attemptsMade + 1 >= (job.opts.attempts ?? 1))
+        if (job.attemptsMade + 1 >= (job.opts.attempts ?? 1)) {
+          this.metrics.inc('report.exports_total', { tenant: tenantId, kind: row.kind, outcome: 'failed' });
           await this.reports.run(() => db().update(reportExport).set({ status: 'failed', failure: (e as Error).message.slice(0, 200) }).where(eq(reportExport.id, exportId)));
+        }
         throw e;
       }
     });

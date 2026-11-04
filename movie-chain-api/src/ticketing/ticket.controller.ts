@@ -4,6 +4,7 @@ import type { Response } from 'express';
 import { Public, Roles } from '../auth/decorators';
 import { RateLimiter } from '../common/rate-limit/rate-limiter';
 import { currentTenant } from '../tenancy/tenant-context';
+import { AllowWhenSuspended } from '../tenancy/decorators';
 import { AdmissionService } from './admission.service';
 import { RedeemTicketDto } from './dto';
 import { TicketQrService } from './qr.service';
@@ -22,6 +23,7 @@ export class TicketController {
    * wrong_day | void | invalid` — a scanner shows a result, it does not branch on HTTP status.
    */
   @Roles('box_office', 'theatre_manager', 'chain_admin')
+  @AllowWhenSuspended() // a customer who already paid still gets in (step 27)
   @HttpCode(200)
   @Post('redeem')
   async redeem(@Body() body: RedeemTicketDto) {

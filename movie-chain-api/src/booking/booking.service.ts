@@ -4,7 +4,7 @@ import { AuditLog } from '../audit/audit-log.service';
 import type { HoldClaims } from '../auth/token-verifier';
 import { PricingService } from '../catalogue/pricing.service';
 import { conflict, notFound, unprocessable } from '../common/errors/api-error';
-import { PaymentRequiredError } from '../common/errors/domain-errors';
+import { DomainError, PaymentRequiredError } from '../common/errors/domain-errors';
 import type { Booking } from '../db/schema/booking';
 import type { PaymentProviderName, TenderType } from '../db/schema/payment';
 import type { ScreenFormat, SeatClass } from '../db/schema/venue';
@@ -102,8 +102,31 @@ export class BookingService implements OnModuleInit {
     this.webhooks.onSettled((e) => this.settleLate(e.tenantId, e.bookingId));
   }
 
+  /**
+   * Checkout, measured: one outcome per attempt (confirmed, pending, replayed,
+   * or the refusal's code), and its latency. Revenue and tickets are counted
+   * in finish(), only after the sale has committed.
+   */
   async checkout(req: CheckoutRequest): Promise<{ status: number; body: Record<string, unknown> }> {
+    const started = process.hrtime.bigint();
+    const labels = { channel: req.boxOffice ? 'box_office' : 'online', method: req.method.kind };
+    let tenant = 'none';
+    try {
+      const r = await this.runCheckout(req, (t) => (tenant = t));
+      const outcome = r.body.replayed ? 'replayed' : r.status === 201 ? 'confirmed' : r.status === 202 ? 'pending' : `status_${r.status}`;
+      this.metrics.inc('booking.checkout_total', { tenant, ...labels, outcome });
+      return r;
+    } catch (e) {
+      this.metrics.inc('booking.checkout_total', { tenant, ...labels, outcome: e instanceof DomainError ? e.code : 'error' });
+      throw e;
+    } finally {
+      this.metrics.observe('booking.checkout_seconds', { tenant, ...labels }, Number(process.hrtime.bigint() - started) / 1e9, [0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30]);
+    }
+  }
+
+  private async runCheckout(req: CheckoutRequest, onTenant: (tenantId: string) => void): Promise<{ status: number; body: Record<string, unknown> }> {
     const claims = await this.tokens.verify(req.holdToken, {});
+    onTenant(claims.tenant_id);
     const ctx = await this.contextFor(claims, req);
     const scope = <T>(fn: () => Promise<T>) => runWithTenant(ctx, () => this.tenantDb.withTenantScope(fn));
 
@@ -233,15 +256,21 @@ export class BookingService implements OnModuleInit {
 
   /** Step 4. No transaction is open here. */
   private async capture(ctx: TenantContext, booking: Booking, method: PaymentMethod): Promise<CaptureResult> {
-    if (method.kind === 'cash') return { status: 'captured', providerRef: `cash_${booking.id}`, capturedAt: new Date() };
+    if (method.kind === 'cash') {
+      this.metrics.inc('payment.capture_total', { provider: 'cash', outcome: 'captured' });
+      return { status: 'captured', providerRef: `cash_${booking.id}`, capturedAt: new Date() };
+    }
     const provider = this.providers.get(method.kind)!;
     const amount = money(booking.totalMinor, booking.currency as Currency);
+    const t0 = process.hrtime.bigint();
     const result = await provider.capture({
       idempotencyKey: booking.id,
       amount,
       method,
       description: `${booking.reference} (${booking.seatIds.length} seat${booking.seatIds.length > 1 ? 's' : ''})`,
     });
+    this.metrics.inc('payment.capture_total', { provider: method.kind, outcome: result.status });
+    this.metrics.observe('payment.capture_seconds', { provider: method.kind }, Number(process.hrtime.bigint() - t0) / 1e9, [0.05, 0.1, 0.5, 1, 2.5, 5, 10, 20, 30]);
     // Remember the provider's reference at once, so its webhook can find this payment.
     if (result.providerRef) {
       const ref = result.providerRef;
@@ -298,6 +327,10 @@ export class BookingService implements OnModuleInit {
     );
     await this.seatmaps.invalidate(ctx.tenantId, booking.screeningId);
     await this.outbox.drain(ctx, outboxIds);
+    // Committed: count the sale (also for a capture confirmed late by the provider's callback).
+    this.metrics.inc('booking.confirmed_total', { tenant: ctx.tenantId, channel: booking.channel });
+    this.metrics.inc('booking.revenue_minor_total', { tenant: ctx.tenantId, currency: booking.currency }, booking.totalMinor);
+    this.metrics.inc('booking.tickets_issued_total', { tenant: ctx.tenantId }, booking.seatIds.length);
     return { status: 201, body: await scope(() => this.view(booking.id)) };
   }
 

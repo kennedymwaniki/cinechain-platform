@@ -1,4 +1,4 @@
-import { HeadBucketCommand, ListObjectsV2Command, PutObjectCommand, GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectsCommand, HeadBucketCommand, ListObjectsV2Command, PutObjectCommand, GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Inject, Injectable, type OnApplicationShutdown } from '@nestjs/common';
 import { APP_CONFIG, type AppConfig } from '../config/app-config';
@@ -69,6 +69,47 @@ export class StorageService implements OnApplicationShutdown {
       token = page.IsTruncated ? page.NextContinuationToken : undefined;
     } while (token);
     return total;
+  }
+
+  /** Every object key under t/<tenant_id>/ (offboarding: what exists, what remains). */
+  async listTenantKeys(tenantId: string): Promise<string[]> {
+    const prefix = StorageService.tenantKey(tenantId, ['x']).slice(0, -1);
+    const keys: string[] = [];
+    let token: string | undefined;
+    do {
+      const page = await this.s3.send(new ListObjectsV2Command({ Bucket: this.bucket, Prefix: prefix, ContinuationToken: token }));
+      for (const o of page.Contents ?? []) if (o.Key) keys.push(o.Key);
+      token = page.IsTruncated ? page.NextContinuationToken : undefined;
+    } while (token);
+    return keys;
+  }
+
+  /** Reads back an object the platform wrote (export verification). Tenant keys only. */
+  async getObjectBytes(key: string): Promise<Buffer> {
+    if (!/^t\/[0-9a-f-]{36}\/[A-Za-z0-9._/-]+$/.test(key) || key.includes('..')) throw new Error('not a tenant object key');
+    const r = await this.s3.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+    return Buffer.from(await r.Body!.transformToByteArray());
+  }
+
+  /** Deletes the given TENANT keys (1 000 per request). */
+  async deleteTenantKeys(tenantId: string, keys: string[]): Promise<number> {
+    const prefix = StorageService.tenantKey(tenantId, ['x']).slice(0, -1);
+    if (keys.some((k) => !k.startsWith(prefix))) throw new Error('refusing to delete a key outside this tenant prefix');
+    let deleted = 0;
+    for (let i = 0; i < keys.length; i += 1000) {
+      const batch = keys.slice(i, i + 1000);
+      await this.s3.send(new DeleteObjectsCommand({ Bucket: this.bucket, Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true } }));
+      deleted += batch.length;
+    }
+    return deleted;
+  }
+
+  /** Platform records kept OUTSIDE any tenant prefix (signed offboarding reports): audit/<path>. */
+  async putAuditObject(path: string[], body: Buffer, contentType: string): Promise<string> {
+    if (!path.length || !path.every((p) => SAFE_SEGMENT.test(p) && p !== '.' && p !== '..')) throw new Error('invalid object path');
+    const key = ['audit', ...path].join('/');
+    await this.s3.send(new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: body, ContentType: contentType }));
+    return key;
   }
 
   async ping(): Promise<void> {

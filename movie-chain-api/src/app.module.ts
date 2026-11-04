@@ -14,6 +14,8 @@ import { NotificationModule } from './notification/notification.module';
 import { ReportingModule } from './reporting/reporting.module';
 import { ExportModule } from './reporting/export.module';
 import { MeteringModule } from './metering/metering.module';
+import { TieringModule } from './tiering/tiering.module';
+import { LifecycleModule } from './lifecycle/lifecycle.module';
 import { BookingMeteringModule } from './metering/booking-metering.module';
 import { GuestLinkModule } from './booking/guest-link.module';
 import { ReconciliationModule } from './booking/reconciliation.module';
@@ -28,6 +30,7 @@ import { StaffModule } from './staff/staff.module';
 import { StorageModule } from './storage/storage.module';
 import { TenancyModule } from './tenancy/tenancy.module';
 import { VenueModule } from './venue/venue.module';
+import { RuntimeGauges } from './observability/runtime-gauges';
 
 @Module({
   imports: [
@@ -57,9 +60,12 @@ import { VenueModule } from './venue/venue.module';
     ExportModule,
     MeteringModule,
     BookingMeteringModule,
+    LifecycleModule,
+    TieringModule, // after AuthModule: its guard needs the tenant the access guard set
     GuestLinkModule,
     ReconciliationModule,
     PublicDiscoveryModule,
   ],
+  providers: [RuntimeGauges],
 })
 export class AppModule {}

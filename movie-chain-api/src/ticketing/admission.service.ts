@@ -8,6 +8,7 @@ import { notFound } from '../common/errors/api-error';
 import { ScreeningService } from '../scheduling/screening.service';
 import { currentTenant, db } from '../tenancy/tenant-context';
 import { TicketCodeService } from './ticket-code.service';
+import { Metrics } from '../observability/metrics.module';
 
 /**
  * FR-60/61. A scan is decided by ONE conditional UPDATE — valid, same
@@ -18,7 +19,10 @@ import { TicketCodeService } from './ticket-code.service';
  */
 @Injectable()
 export class AdmissionService {
-  constructor(private readonly screenings: ScreeningService) {}
+  constructor(
+    private readonly screenings: ScreeningService,
+    private readonly metrics: Metrics,
+  ) {}
 
   async redeem(code: string, screeningId: string, deviceId: string) {
     // The screening being admitted: this chain's, within the clerk's theatres (else 404).
@@ -56,6 +60,7 @@ export class AdmissionService {
     }
 
     await db().insert(admissionEvent).values({ tenantId, ticketId, screeningId, result, deviceId, operatorId });
+    this.metrics.inc('admission.scans_total', { tenant: tenantId, result });
     const seatInfo = ticketId ? await this.seatOf(ticketId) : null;
     return {
       result,

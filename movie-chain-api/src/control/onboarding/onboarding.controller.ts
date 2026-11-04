@@ -12,7 +12,8 @@ class CreateTenantDto extends createZodDto(
     .object({
       name: z.string().min(2).max(120),
       slug: z.string().regex(/^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/, 'lowercase letters, digits and hyphens'),
-      tier: z.enum(['basic', 'standard', 'premium', 'dedicated']).default('basic'),
+      // A tier CODE: the `tier` table is the catalogue, so a new tier needs no code here.
+      tier: z.string().regex(/^[a-z][a-z0-9_]{1,30}$/).default('basic'),
       country: z.string().regex(/^[A-Z]{2}$/).default('KE'),
       contactEmail: z.email().max(254),
       contactName: z.string().min(1).max(120).optional(),

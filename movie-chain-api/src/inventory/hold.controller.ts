@@ -1,3 +1,4 @@
+import { RateLimitTenantFrom } from '../tiering/decorators';
 import { Body, Controller, Delete, Headers, HttpCode, Param, Post, Req } from '@nestjs/common';
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 import { ConsumerRoute, Roles } from '../auth/decorators';
@@ -28,6 +29,7 @@ export class HoldController {
 
   @ConsumerRoute()
   @DeferTenantTransaction()
+  @RateLimitTenantFrom('screening')
   @Post('screenings/:id/holds')
   create(@Param('id', Uuid) id: string, @Body() body: CreateHoldDto, @Req() req: ConsumerRequest) {
     return this.holds.placeOnline(id, body.seat_ids, actorOf(req));
@@ -37,6 +39,7 @@ export class HoldController {
   @DeferTenantTransaction()
   @ApiHeader({ name: HOLD_TOKEN_HEADER, required: true })
   @HttpCode(204)
+  @RateLimitTenantFrom('hold_token')
   @Delete('holds/:id')
   async release(@Param('id', Uuid) id: string, @Headers(HOLD_TOKEN_HEADER) token: string | undefined, @Req() req: ConsumerRequest) {
     await this.holds.release(id, token, actorOf(req));
@@ -46,6 +49,7 @@ export class HoldController {
   @DeferTenantTransaction()
   @ApiHeader({ name: HOLD_TOKEN_HEADER, required: true })
   @HttpCode(200)
+  @RateLimitTenantFrom('hold_token')
   @Post('holds/:id/extend')
   extend(@Param('id', Uuid) id: string, @Headers(HOLD_TOKEN_HEADER) token: string | undefined, @Req() req: ConsumerRequest) {
     return this.holds.extend(id, token, actorOf(req));

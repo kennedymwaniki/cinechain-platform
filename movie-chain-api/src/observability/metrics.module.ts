@@ -1,7 +1,8 @@
+import { SkipRateLimit } from '../tiering/decorators';
 import { Controller, Get, Global, Header, Inject, Injectable, Module, Req } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import type { Request } from 'express';
-import { Counter, Gauge, Histogram, Registry } from 'prom-client';
+import { collectDefaultMetrics, Counter, Gauge, Histogram, Registry } from 'prom-client';
 import { timingSafeEqual } from 'node:crypto';
 import { Public } from '../auth/decorators';
 import { notFound } from '../common/errors/api-error';
@@ -28,6 +29,34 @@ export class Metrics {
   private readonly histograms = new Map<string, Histogram<string>>();
   /** What was written, keyed by name + (mapped) labels: read back by get()/total() without prom-client internals. */
   private readonly mirror = new Map<string, number>();
+
+  constructor() {
+    // Event-loop lag, heap, GC, handles: `cinechain_node_*`.
+    collectDefaultMetrics({ register: this.registry, prefix: 'cinechain_node_' });
+  }
+
+  /**
+   * A gauge whose value is READ at scrape time (pool sizes, queue depths), so
+   * it can never be stale. A read that fails leaves the series out of that
+   * scrape rather than failing the scrape.
+   */
+  sampled(name: string, help: string, labelNames: string[], read: () => Promise<Array<[Labels, number]>> | Array<[Labels, number]>): void {
+    if (this.registry.getSingleMetric(promName(name))) return;
+    new Gauge({
+      name: promName(name),
+      help,
+      labelNames,
+      registers: [this.registry],
+      async collect() {
+        this.reset();
+        try {
+          for (const [l, v] of await read()) this.set(l, v);
+        } catch {
+          /* unavailable this scrape */
+        }
+      },
+    });
+  }
 
   private key(name: string, l: Labels): string {
     return `${name}{${Object.keys(l).sort().map((k) => `${k}=${l[k]}`).join(',')}}`;
@@ -109,6 +138,7 @@ export class MetricsController {
     @Inject(APP_CONFIG) private readonly cfg: AppConfig,
   ) {}
 
+  @SkipRateLimit()
   @Public()
   @Get()
   @Header('content-type', 'text/plain; version=0.0.4; charset=utf-8')

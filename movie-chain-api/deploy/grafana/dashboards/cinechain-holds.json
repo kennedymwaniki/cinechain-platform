@@ -1,0 +1,1181 @@
+{
+ "uid": "cinechain-holds",
+ "title": "CineChain — Holds & seat inventory",
+ "description": "Seat holds: placed, refused, released, extended; Redis lock latency; the sweeper and integrity guards.",
+ "tags": [
+  "cinechain",
+  "business"
+ ],
+ "timezone": "browser",
+ "schemaVersion": 41,
+ "version": 1,
+ "editable": true,
+ "graphTooltip": 1,
+ "refresh": "30s",
+ "time": {
+  "from": "now-6h",
+  "to": "now"
+ },
+ "links": [
+  {
+   "title": "CineChain",
+   "type": "dashboards",
+   "tags": [
+    "cinechain"
+   ],
+   "asDropdown": true,
+   "includeVars": false,
+   "keepTime": true
+  }
+ ],
+ "templating": {
+  "list": [
+   {
+    "name": "tenant",
+    "label": "chain",
+    "type": "query",
+    "datasource": {
+     "type": "prometheus",
+     "uid": "prometheus"
+    },
+    "definition": "query_result(max by (slug, tenant) (cinechain_tenant_info{status!=\"deleted\"}))",
+    "query": {
+     "query": "query_result(max by (slug, tenant) (cinechain_tenant_info{status!=\"deleted\"}))",
+     "refId": "tenant"
+    },
+    "regex": "/slug=\"(?<text>[^\"]+)\".*tenant=\"(?<value>[^\"]+)\"/",
+    "includeAll": true,
+    "multi": true,
+    "allValue": ".*",
+    "current": {
+     "text": "All",
+     "value": "$__all"
+    },
+    "refresh": 2,
+    "sort": 1
+   }
+  ]
+ },
+ "annotations": {
+  "list": []
+ },
+ "panels": [
+  {
+   "id": 1,
+   "type": "stat",
+   "title": "Holds placed",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "((sum(((cinechain_hold_placed_total{tenant=~\"$tenant\"} - (cinechain_hold_placed_total{tenant=~\"$tenant\"} offset $__range or cinechain_hold_placed_total{tenant=~\"$tenant\"} * 0)) and resets(cinechain_hold_placed_total{tenant=~\"$tenant\"}[$__range]) == 0 or increase(cinechain_hold_placed_total{tenant=~\"$tenant\"}[$__range]) and resets(cinechain_hold_placed_total{tenant=~\"$tenant\"}[$__range]) > 0)) or vector(0))) or vector(0)",
+     "instant": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "0",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "mappings": [],
+     "color": {
+      "mode": "thresholds"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "value",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   }
+  },
+  {
+   "id": 2,
+   "type": "stat",
+   "title": "Holds refused",
+   "description": "Seats taken, seat gaps, too many seats…",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "((sum(((cinechain_hold_refused_total{tenant=~\"$tenant\"} - (cinechain_hold_refused_total{tenant=~\"$tenant\"} offset $__range or cinechain_hold_refused_total{tenant=~\"$tenant\"} * 0)) and resets(cinechain_hold_refused_total{tenant=~\"$tenant\"}[$__range]) == 0 or increase(cinechain_hold_refused_total{tenant=~\"$tenant\"}[$__range]) and resets(cinechain_hold_refused_total{tenant=~\"$tenant\"}[$__range]) > 0)) or vector(0))) or vector(0)",
+     "instant": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "0",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "mappings": [],
+     "color": {
+      "mode": "thresholds"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "value",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "gridPos": {
+    "x": 4,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   }
+  },
+  {
+   "id": 3,
+   "type": "stat",
+   "title": "Seats released",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "((sum(((cinechain_hold_released_total{tenant=~\"$tenant\"} - (cinechain_hold_released_total{tenant=~\"$tenant\"} offset $__range or cinechain_hold_released_total{tenant=~\"$tenant\"} * 0)) and resets(cinechain_hold_released_total{tenant=~\"$tenant\"}[$__range]) == 0 or increase(cinechain_hold_released_total{tenant=~\"$tenant\"}[$__range]) and resets(cinechain_hold_released_total{tenant=~\"$tenant\"}[$__range]) > 0)) or vector(0))) or vector(0)",
+     "instant": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "0",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "mappings": [],
+     "color": {
+      "mode": "thresholds"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "value",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "gridPos": {
+    "x": 8,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   }
+  },
+  {
+   "id": 4,
+   "type": "stat",
+   "title": "Hold acquire p99",
+   "description": "Target: < 400 ms at p99 (step 25).",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "(histogram_quantile(0.99, sum by (le) (rate(cinechain_hold_acquire_seconds_bucket{tenant=~\"$tenant\"}[5m])))) or vector(0)",
+     "instant": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s",
+     "decimals": 3,
+     "noValue": "0",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 0.25
+       },
+       {
+        "color": "red",
+        "value": 0.4
+       }
+      ]
+     },
+     "mappings": [],
+     "color": {
+      "mode": "thresholds"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "colorMode": "background",
+    "graphMode": "none",
+    "textMode": "value",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   }
+  },
+  {
+   "id": 5,
+   "type": "stat",
+   "title": "Double sales (ever)",
+   "description": "Must stay 0. Any value pages.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "(sum(cinechain_double_sale_total)) or vector(0)",
+     "instant": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "0",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 1
+       }
+      ]
+     },
+     "mappings": [],
+     "color": {
+      "mode": "thresholds"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "colorMode": "background",
+    "graphMode": "none",
+    "textMode": "value",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "gridPos": {
+    "x": 16,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   }
+  },
+  {
+   "id": 6,
+   "type": "stat",
+   "title": "Locks past expiry",
+   "description": "Seat locks the sweeper has not yet reclaimed.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "(sum(cinechain_seat_locks_past_expiry{tenant=~\"$tenant\"})) or vector(0)",
+     "instant": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "0",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 1
+       },
+       {
+        "color": "red",
+        "value": 50
+       }
+      ]
+     },
+     "mappings": [],
+     "color": {
+      "mode": "thresholds"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "colorMode": "background",
+    "graphMode": "none",
+    "textMode": "value",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "gridPos": {
+    "x": 20,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   }
+  },
+  {
+   "id": 7,
+   "type": "row",
+   "title": "Flow",
+   "collapsed": false,
+   "panels": [],
+   "gridPos": {
+    "x": 0,
+    "y": 4,
+    "w": 24,
+    "h": 1
+   }
+  },
+  {
+   "id": 8,
+   "type": "timeseries",
+   "title": "Holds placed / min by path",
+   "description": "redis = fast path; postgres = fallback while Redis is degraded.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "60 * sum by (path) (rate(cinechain_hold_placed_total{tenant=~\"$tenant\"}[5m]))",
+     "legendFormat": "{{path}}"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "No data available",
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 60,
+      "lineWidth": 2,
+      "showPoints": "never",
+      "spanNulls": true,
+      "stacking": {
+       "mode": "normal",
+       "group": "A"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "color": {
+      "mode": "palette-classic"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 5,
+    "w": 12,
+    "h": 8
+   }
+  },
+  {
+   "id": 9,
+   "type": "timeseries",
+   "title": "Holds refused / min by reason",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "60 * sum by (reason) (rate(cinechain_hold_refused_total{tenant=~\"$tenant\"}[5m]))",
+     "legendFormat": "{{reason}}"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "No data available",
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "custom": {
+      "drawStyle": "bars",
+      "fillOpacity": 60,
+      "lineWidth": 2,
+      "showPoints": "never",
+      "spanNulls": true,
+      "stacking": {
+       "mode": "none",
+       "group": "A"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "color": {
+      "mode": "palette-classic"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 5,
+    "w": 12,
+    "h": 8
+   }
+  },
+  {
+   "id": 10,
+   "type": "timeseries",
+   "title": "Released and extended / min",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "60 * sum(rate(cinechain_hold_released_total{tenant=~\"$tenant\"}[5m]))",
+     "legendFormat": "seats released"
+    },
+    {
+     "refId": "B",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "60 * sum(rate(cinechain_hold_extended_total{tenant=~\"$tenant\"}[5m]))",
+     "legendFormat": "holds extended"
+    },
+    {
+     "refId": "C",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "60 * sum(rate(cinechain_sweeper_reclaimed_total{tenant=~\"$tenant\"}[5m]))",
+     "legendFormat": "seats reclaimed by sweeper"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "No data available",
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 12,
+      "lineWidth": 2,
+      "showPoints": "never",
+      "spanNulls": true,
+      "stacking": {
+       "mode": "none",
+       "group": "A"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "color": {
+      "mode": "palette-classic"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 13,
+    "w": 12,
+    "h": 8
+   }
+  },
+  {
+   "id": 11,
+   "type": "timeseries",
+   "title": "Hold acquire latency by path",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "histogram_quantile(0.5, sum by (le, path) (rate(cinechain_hold_acquire_seconds_bucket{tenant=~\"$tenant\"}[5m])))",
+     "legendFormat": "p50 {{path}}"
+    },
+    {
+     "refId": "B",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "histogram_quantile(0.99, sum by (le, path) (rate(cinechain_hold_acquire_seconds_bucket{tenant=~\"$tenant\"}[5m])))",
+     "legendFormat": "p99 {{path}}"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s",
+     "noValue": "No data available",
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 0.4
+       }
+      ]
+     },
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 12,
+      "lineWidth": 2,
+      "showPoints": "never",
+      "spanNulls": true,
+      "stacking": {
+       "mode": "none",
+       "group": "A"
+      },
+      "thresholdsStyle": {
+       "mode": "line"
+      }
+     },
+     "color": {
+      "mode": "palette-classic"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 13,
+    "w": 12,
+    "h": 8
+   }
+  },
+  {
+   "id": 12,
+   "type": "row",
+   "title": "Integrity & sweeper",
+   "collapsed": false,
+   "panels": [],
+   "gridPos": {
+    "x": 0,
+    "y": 21,
+    "w": 24,
+    "h": 1
+   }
+  },
+  {
+   "id": 13,
+   "type": "timeseries",
+   "title": "Sweeper lag by chain",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "(max by (tenant) (cinechain_sweeper_lag{tenant=~\"$tenant\"})) * on (tenant) group_left (slug) max by (tenant, slug) (cinechain_tenant_info) or on (tenant) label_replace(max by (tenant) (cinechain_sweeper_lag{tenant=~\"$tenant\"}), \"slug\", \"$1\", \"tenant\", \"(.*)\")",
+     "legendFormat": "{{slug}}"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s",
+     "noValue": "No data available",
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 12,
+      "lineWidth": 2,
+      "showPoints": "never",
+      "spanNulls": true,
+      "stacking": {
+       "mode": "none",
+       "group": "A"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "color": {
+      "mode": "palette-classic"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 22,
+    "w": 8,
+    "h": 8
+   }
+  },
+  {
+   "id": 14,
+   "type": "timeseries",
+   "title": "Seat locks past expiry by chain",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "(sum by (tenant) (cinechain_seat_locks_past_expiry{tenant=~\"$tenant\"})) * on (tenant) group_left (slug) max by (tenant, slug) (cinechain_tenant_info) or on (tenant) label_replace(sum by (tenant) (cinechain_seat_locks_past_expiry{tenant=~\"$tenant\"}), \"slug\", \"$1\", \"tenant\", \"(.*)\")",
+     "legendFormat": "{{slug}}"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "No data available",
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 12,
+      "lineWidth": 2,
+      "showPoints": "never",
+      "spanNulls": true,
+      "stacking": {
+       "mode": "none",
+       "group": "A"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "color": {
+      "mode": "palette-classic"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "gridPos": {
+    "x": 8,
+    "y": 22,
+    "w": 8,
+    "h": 8
+   }
+  },
+  {
+   "id": 15,
+   "type": "timeseries",
+   "title": "Redis ↔ Postgres divergence / min",
+   "description": "Redis said free, Postgres said taken (or the reverse). Postgres wins.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "60 * sum(rate(cinechain_hold_redis_postgres_divergence_total[5m]))",
+     "legendFormat": "divergences"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "No data available",
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 12,
+      "lineWidth": 2,
+      "showPoints": "never",
+      "spanNulls": true,
+      "stacking": {
+       "mode": "none",
+       "group": "A"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "color": {
+      "mode": "palette-classic"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "gridPos": {
+    "x": 16,
+    "y": 22,
+    "w": 8,
+    "h": 8
+   }
+  },
+  {
+   "id": 16,
+   "type": "piechart",
+   "title": "Refusal reasons",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (reason) (((cinechain_hold_refused_total{tenant=~\"$tenant\"} - (cinechain_hold_refused_total{tenant=~\"$tenant\"} offset $__range or cinechain_hold_refused_total{tenant=~\"$tenant\"} * 0)) and resets(cinechain_hold_refused_total{tenant=~\"$tenant\"}[$__range]) == 0 or increase(cinechain_hold_refused_total{tenant=~\"$tenant\"}[$__range]) and resets(cinechain_hold_refused_total{tenant=~\"$tenant\"}[$__range]) > 0))",
+     "instant": true,
+     "legendFormat": "{{reason}}"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "No data available",
+     "color": {
+      "mode": "palette-classic"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "pieType": "donut",
+    "legend": {
+     "displayMode": "table",
+     "placement": "right",
+     "values": [
+      "value",
+      "percent"
+     ]
+    },
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "tooltip": {
+     "mode": "single"
+    }
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 30,
+    "w": 8,
+    "h": 8
+   }
+  },
+  {
+   "id": 17,
+   "type": "piechart",
+   "title": "Hold channel (refusals)",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (channel) (((cinechain_hold_refused_total{tenant=~\"$tenant\"} - (cinechain_hold_refused_total{tenant=~\"$tenant\"} offset $__range or cinechain_hold_refused_total{tenant=~\"$tenant\"} * 0)) and resets(cinechain_hold_refused_total{tenant=~\"$tenant\"}[$__range]) == 0 or increase(cinechain_hold_refused_total{tenant=~\"$tenant\"}[$__range]) and resets(cinechain_hold_refused_total{tenant=~\"$tenant\"}[$__range]) > 0))",
+     "instant": true,
+     "legendFormat": "{{channel}}"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "No data available",
+     "color": {
+      "mode": "palette-classic"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "pieType": "donut",
+    "legend": {
+     "displayMode": "table",
+     "placement": "right",
+     "values": [
+      "value",
+      "percent"
+     ]
+    },
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "tooltip": {
+     "mode": "single"
+    }
+   },
+   "gridPos": {
+    "x": 8,
+    "y": 30,
+    "w": 8,
+    "h": 8
+   }
+  },
+  {
+   "id": 18,
+   "type": "bargauge",
+   "title": "Holds placed by chain",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "(sum by (tenant) (((cinechain_hold_placed_total{tenant=~\"$tenant\"} - (cinechain_hold_placed_total{tenant=~\"$tenant\"} offset $__range or cinechain_hold_placed_total{tenant=~\"$tenant\"} * 0)) and resets(cinechain_hold_placed_total{tenant=~\"$tenant\"}[$__range]) == 0 or increase(cinechain_hold_placed_total{tenant=~\"$tenant\"}[$__range]) and resets(cinechain_hold_placed_total{tenant=~\"$tenant\"}[$__range]) > 0))) * on (tenant) group_left (slug) max by (tenant, slug) (cinechain_tenant_info) or on (tenant) label_replace(sum by (tenant) (((cinechain_hold_placed_total{tenant=~\"$tenant\"} - (cinechain_hold_placed_total{tenant=~\"$tenant\"} offset $__range or cinechain_hold_placed_total{tenant=~\"$tenant\"} * 0)) and resets(cinechain_hold_placed_total{tenant=~\"$tenant\"}[$__range]) == 0 or increase(cinechain_hold_placed_total{tenant=~\"$tenant\"}[$__range]) and resets(cinechain_hold_placed_total{tenant=~\"$tenant\"}[$__range]) > 0)), \"slug\", \"$1\", \"tenant\", \"(.*)\")",
+     "instant": true,
+     "legendFormat": "{{slug}}"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "No data available",
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "blue",
+        "value": null
+       }
+      ]
+     },
+     "color": {
+      "mode": "continuous-BlPu"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "orientation": "horizontal",
+    "displayMode": "gradient",
+    "showUnfilled": true,
+    "valueMode": "color",
+    "namePlacement": "left",
+    "sizing": "auto",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "gridPos": {
+    "x": 16,
+    "y": 30,
+    "w": 8,
+    "h": 8
+   }
+  }
+ ]
+}

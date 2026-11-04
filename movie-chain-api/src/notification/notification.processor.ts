@@ -8,6 +8,7 @@ import { runWithTenant } from '../tenancy/tenant-context';
 import { TenantDb } from '../tenancy/tenant-db.provider';
 import { TenantRegistry } from '../tenancy/tenant-registry.service';
 import { Notifier } from './notifier';
+import { Metrics } from '../observability/metrics.module';
 
 export const NOTIFICATION_QUEUE = 'notification';
 
@@ -52,6 +53,7 @@ export class NotificationProcessor extends WorkerHost implements BeforeApplicati
     private readonly registry: TenantRegistry,
     private readonly bookings: BookingService,
     private readonly notifier: Notifier,
+    private readonly metrics: Metrics,
   ) {
     super();
   }
@@ -61,6 +63,18 @@ export class NotificationProcessor extends WorkerHost implements BeforeApplicati
   }
 
   async process(job: Job<NotificationJob>): Promise<string> {
+    const { tenantId, kind } = job.data;
+    try {
+      const outcome = await this.deliver(job);
+      this.metrics.inc('notification.total', { tenant: tenantId, kind, outcome: outcome === 'sent' ? 'sent' : 'skipped_no_contact' });
+      return outcome;
+    } catch (e) {
+      this.metrics.inc('notification.total', { tenant: tenantId, kind, outcome: 'failed' });
+      throw e;
+    }
+  }
+
+  private async deliver(job: Job<NotificationJob>): Promise<string> {
     const { tenantId, kind, bookingId } = job.data;
     return runWithTenant(toSystemContext({ tenantId }, { kind: 'system', reason: 'notification' }), async () => {
       const view = await this.tenantDb.withTenantScope(() => this.bookings.view(bookingId));

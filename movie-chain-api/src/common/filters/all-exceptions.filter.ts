@@ -2,7 +2,7 @@ import { type ArgumentsHost, Catch, type ExceptionFilter, HttpException, Inject,
 import type { Request, Response } from 'express';
 import { SecurityEvents } from '../../audit/security-event.service';
 import { maybeCurrentTenant } from '../../tenancy/tenant-context';
-import { DomainError, NotFoundError, STATUS_BY_CLASS, TenantMismatchError } from '../errors/domain-errors';
+import { DomainError, NotFoundError, RateLimitedError, STATUS_BY_CLASS, TenantMismatchError } from '../errors/domain-errors';
 
 interface Body {
   error: string;
@@ -72,6 +72,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const res = host.switchToHttp().getResponse<Response>();
     const { status, body } = await this.render(exception, req);
     if (res.headersSent) return;
+    if (exception instanceof RateLimitedError) res.setHeader('Retry-After', String(Math.max(1, exception.retryAfterS)));
     res.status(status).json(body);
   }
 

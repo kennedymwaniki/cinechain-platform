@@ -67,6 +67,19 @@ export class SeatmapService {
     });
     if (cached) return JSON.parse(cached) as Snapshot;
 
+    // Single flight: concurrent misses for one screening (right after a hold
+    // invalidated it) share ONE database load instead of stampeding.
+    const pending = this.inflight.get(key);
+    if (pending) return pending;
+    const load = this.load(tenantId, screeningId, actor, key).finally(() => this.inflight.delete(key));
+    this.inflight.set(key, load);
+    return load;
+  }
+
+  private readonly inflight = new Map<string, Promise<Snapshot>>();
+
+  private async load(tenantId: string, screeningId: string, actor: Actor, key: string): Promise<Snapshot> {
+
     this.dbLoads++;
     const snap = await runWithTenant(toSystemContext({ tenantId }, actor), () =>
       this.tenantDb.withTenantScope(async (): Promise<Snapshot> => {

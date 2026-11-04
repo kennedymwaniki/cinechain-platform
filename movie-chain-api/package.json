@@ -21,7 +21,11 @@
     "db:generate": "drizzle-kit generate",
     "db:seed": "tsx tools/db-seed.ts",
     "start:control:dev": "nest start --watch --entryFile main-control",
-    "test:concurrency": "vitest run --config vitest.concurrency.config.mts"
+    "test:concurrency": "vitest run --config vitest.concurrency.config.mts",
+    "grafana:dashboards": "node deploy/grafana/gen-dashboards.mjs",
+    "ingress:limits": "tsx tools/gen-ingress-limits.ts",
+    "load:blockbuster": "tsx tools/run-blockbuster.ts",
+    "load:seed": "tsx tools/seed-load.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1158.0",

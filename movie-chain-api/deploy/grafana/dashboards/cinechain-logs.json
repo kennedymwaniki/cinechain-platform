@@ -1,0 +1,298 @@
+{
+ "uid": "cinechain-logs",
+ "title": "CineChain — Logs explorer",
+ "description": "Loki: both planes, filterable by level, component (context) and tenant_id (structured metadata).",
+ "tags": [
+  "cinechain",
+  "logs"
+ ],
+ "timezone": "browser",
+ "schemaVersion": 41,
+ "version": 1,
+ "editable": true,
+ "graphTooltip": 1,
+ "refresh": "",
+ "time": {
+  "from": "now-1h",
+  "to": "now"
+ },
+ "links": [
+  {
+   "title": "CineChain",
+   "type": "dashboards",
+   "tags": [
+    "cinechain"
+   ],
+   "asDropdown": true,
+   "includeVars": false,
+   "keepTime": true
+  }
+ ],
+ "templating": {
+  "list": [
+   {
+    "name": "service",
+    "label": "service",
+    "type": "custom",
+    "query": "cinechain-api,cinechain-control",
+    "includeAll": true,
+    "multi": true,
+    "allValue": "cinechain-.*",
+    "current": {
+     "text": "All",
+     "value": "$__all"
+    }
+   },
+   {
+    "name": "level",
+    "label": "level",
+    "type": "custom",
+    "query": "trace,debug,info,warn,error,fatal",
+    "includeAll": true,
+    "multi": true,
+    "allValue": ".+",
+    "current": {
+     "text": "All",
+     "value": "$__all"
+    }
+   },
+   {
+    "name": "context",
+    "label": "component",
+    "type": "query",
+    "datasource": {
+     "type": "loki",
+     "uid": "loki"
+    },
+    "query": {
+     "label": "context",
+     "stream": "{service=~\"cinechain-.*\"}",
+     "type": 1,
+     "refId": "context"
+    },
+    "definition": "label_values({service=~\"cinechain-.*\"}, context)",
+    "includeAll": true,
+    "multi": true,
+    "allValue": ".*",
+    "current": {
+     "text": "All",
+     "value": "$__all"
+    },
+    "refresh": 2,
+    "sort": 1
+   },
+   {
+    "name": "tenant_id",
+    "label": "tenant_id",
+    "type": "textbox",
+    "query": ".*",
+    "current": {
+     "text": ".*",
+     "value": ".*"
+    }
+   },
+   {
+    "name": "search",
+    "label": "contains (regex)",
+    "type": "textbox",
+    "query": "",
+    "current": {
+     "text": "",
+     "value": ""
+    }
+   }
+  ]
+ },
+ "annotations": {
+  "list": []
+ },
+ "panels": [
+  {
+   "id": 1,
+   "type": "timeseries",
+   "title": "Log lines / min by level",
+   "description": "",
+   "datasource": {
+    "type": "loki",
+    "uid": "loki"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "loki",
+      "uid": "loki"
+     },
+     "expr": "sum by (level) (count_over_time({service=~\"$service\", level=~\"$level\", context=~\"$context\"} | tenant_id=~\"$tenant_id\" [1m]))",
+     "legendFormat": "{{level}}",
+     "queryType": "range"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "No data available",
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "custom": {
+      "drawStyle": "bars",
+      "fillOpacity": 60,
+      "lineWidth": 2,
+      "showPoints": "never",
+      "spanNulls": true,
+      "stacking": {
+       "mode": "none",
+       "group": "A"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "color": {
+      "mode": "palette-classic"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 0,
+    "w": 12,
+    "h": 7
+   }
+  },
+  {
+   "id": 2,
+   "type": "timeseries",
+   "title": "Errors & warnings / min by component",
+   "description": "",
+   "datasource": {
+    "type": "loki",
+    "uid": "loki"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "loki",
+      "uid": "loki"
+     },
+     "expr": "sum by (context) (count_over_time({service=~\"$service\", level=~\"warn|error|fatal\", context=~\"$context\"} | tenant_id=~\"$tenant_id\" [1m]))",
+     "legendFormat": "{{context}}",
+     "queryType": "range"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "No data available",
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 60,
+      "lineWidth": 2,
+      "showPoints": "never",
+      "spanNulls": true,
+      "stacking": {
+       "mode": "normal",
+       "group": "A"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "color": {
+      "mode": "palette-classic"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 0,
+    "w": 12,
+    "h": 7
+   }
+  },
+  {
+   "id": 3,
+   "type": "logs",
+   "title": "Logs",
+   "description": "",
+   "datasource": {
+    "type": "loki",
+    "uid": "loki"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "loki",
+      "uid": "loki"
+     },
+     "expr": "{service=~\"$service\", level=~\"$level\", context=~\"$context\"} | tenant_id=~\"$tenant_id\" |~ \"$search\"",
+     "queryType": "range"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "noValue": "No data available"
+    },
+    "overrides": []
+   },
+   "options": {
+    "showTime": true,
+    "wrapLogMessage": true,
+    "sortOrder": "Descending",
+    "enableLogDetails": true,
+    "prettifyLogMessage": false,
+    "dedupStrategy": "none"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 7,
+    "w": 24,
+    "h": 18
+   }
+  }
+ ]
+}

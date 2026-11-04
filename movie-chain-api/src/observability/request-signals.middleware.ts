@@ -56,6 +56,12 @@ export class RequestSignalsMiddleware implements NestMiddleware {
         { tenant: signals.tenantId ?? 'none', method: req.method, status: `${Math.floor(res.statusCode / 100)}xx` },
         Number(process.hrtime.bigint() - started) / 1e9,
       );
+      // Per ROUTE TEMPLATE (never the raw path: ids would explode cardinality), across tenants.
+      this.metrics.observe(
+        'http.route_duration_seconds',
+        { route: route === 'unmatched' ? 'unmatched' : `${req.baseUrl}${route}`, method: req.method, status: String(res.statusCode) },
+        Number(process.hrtime.bigint() - started) / 1e9,
+      );
     });
 
     requestAls.run(signals, () => context.with(trace.setSpan(context.active(), span), next));

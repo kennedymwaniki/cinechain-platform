@@ -1,0 +1,1137 @@
+{
+ "uid": "cinechain-payments",
+ "title": "CineChain — Payments & refunds",
+ "description": "Provider captures and latency, webhooks, refunds by reason, and the reconciler that repairs orphaned payments.",
+ "tags": [
+  "cinechain",
+  "business"
+ ],
+ "timezone": "browser",
+ "schemaVersion": 41,
+ "version": 1,
+ "editable": true,
+ "graphTooltip": 1,
+ "refresh": "30s",
+ "time": {
+  "from": "now-6h",
+  "to": "now"
+ },
+ "links": [
+  {
+   "title": "CineChain",
+   "type": "dashboards",
+   "tags": [
+    "cinechain"
+   ],
+   "asDropdown": true,
+   "includeVars": false,
+   "keepTime": true
+  }
+ ],
+ "templating": {
+  "list": [
+   {
+    "name": "tenant",
+    "label": "chain",
+    "type": "query",
+    "datasource": {
+     "type": "prometheus",
+     "uid": "prometheus"
+    },
+    "definition": "query_result(max by (slug, tenant) (cinechain_tenant_info{status!=\"deleted\"}))",
+    "query": {
+     "query": "query_result(max by (slug, tenant) (cinechain_tenant_info{status!=\"deleted\"}))",
+     "refId": "tenant"
+    },
+    "regex": "/slug=\"(?<text>[^\"]+)\".*tenant=\"(?<value>[^\"]+)\"/",
+    "includeAll": true,
+    "multi": true,
+    "allValue": ".*",
+    "current": {
+     "text": "All",
+     "value": "$__all"
+    },
+    "refresh": 2,
+    "sort": 1
+   }
+  ]
+ },
+ "annotations": {
+  "list": []
+ },
+ "panels": [
+  {
+   "id": 1,
+   "type": "stat",
+   "title": "Captures OK",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "((sum(((cinechain_payment_capture_total{outcome=\"captured\"} - (cinechain_payment_capture_total{outcome=\"captured\"} offset $__range or cinechain_payment_capture_total{outcome=\"captured\"} * 0)) and resets(cinechain_payment_capture_total{outcome=\"captured\"}[$__range]) == 0 or increase(cinechain_payment_capture_total{outcome=\"captured\"}[$__range]) and resets(cinechain_payment_capture_total{outcome=\"captured\"}[$__range]) > 0)) or vector(0))) or vector(0)",
+     "instant": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "0",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "mappings": [],
+     "color": {
+      "mode": "thresholds"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "value",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   }
+  },
+  {
+   "id": 2,
+   "type": "stat",
+   "title": "Capture failures",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "((sum(((cinechain_payment_capture_total{outcome=\"failed\"} - (cinechain_payment_capture_total{outcome=\"failed\"} offset $__range or cinechain_payment_capture_total{outcome=\"failed\"} * 0)) and resets(cinechain_payment_capture_total{outcome=\"failed\"}[$__range]) == 0 or increase(cinechain_payment_capture_total{outcome=\"failed\"}[$__range]) and resets(cinechain_payment_capture_total{outcome=\"failed\"}[$__range]) > 0)) or vector(0))) or vector(0)",
+     "instant": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "0",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 1
+       },
+       {
+        "color": "red",
+        "value": 20
+       }
+      ]
+     },
+     "mappings": [],
+     "color": {
+      "mode": "thresholds"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "colorMode": "background",
+    "graphMode": "none",
+    "textMode": "value",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "gridPos": {
+    "x": 4,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   }
+  },
+  {
+   "id": 3,
+   "type": "stat",
+   "title": "Capture success rate",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "((((sum(((cinechain_payment_capture_total{outcome=\"captured\"} - (cinechain_payment_capture_total{outcome=\"captured\"} offset $__range or cinechain_payment_capture_total{outcome=\"captured\"} * 0)) and resets(cinechain_payment_capture_total{outcome=\"captured\"}[$__range]) == 0 or increase(cinechain_payment_capture_total{outcome=\"captured\"}[$__range]) and resets(cinechain_payment_capture_total{outcome=\"captured\"}[$__range]) > 0)) or vector(0))) / clamp_min((sum(((cinechain_payment_capture_total - (cinechain_payment_capture_total offset $__range or cinechain_payment_capture_total * 0)) and resets(cinechain_payment_capture_total[$__range]) == 0 or increase(cinechain_payment_capture_total[$__range]) and resets(cinechain_payment_capture_total[$__range]) > 0)) or vector(0)), 1e-9)) or vector(0)) or vector(0)",
+     "instant": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percentunit",
+     "decimals": 1,
+     "noValue": "0",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "mappings": [],
+     "color": {
+      "mode": "thresholds"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "value",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "gridPos": {
+    "x": 8,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   }
+  },
+  {
+   "id": 4,
+   "type": "stat",
+   "title": "Refunds succeeded",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "((sum(((cinechain_refund_total{tenant=~\"$tenant\",status=\"succeeded\"} - (cinechain_refund_total{tenant=~\"$tenant\",status=\"succeeded\"} offset $__range or cinechain_refund_total{tenant=~\"$tenant\",status=\"succeeded\"} * 0)) and resets(cinechain_refund_total{tenant=~\"$tenant\",status=\"succeeded\"}[$__range]) == 0 or increase(cinechain_refund_total{tenant=~\"$tenant\",status=\"succeeded\"}[$__range]) and resets(cinechain_refund_total{tenant=~\"$tenant\",status=\"succeeded\"}[$__range]) > 0)) or vector(0))) or vector(0)",
+     "instant": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "0",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "mappings": [],
+     "color": {
+      "mode": "thresholds"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "value",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   }
+  },
+  {
+   "id": 5,
+   "type": "stat",
+   "title": "Refunds failed",
+   "description": "A failed refund PAGES: money owed to a customer.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "((sum(((cinechain_refund_total{tenant=~\"$tenant\",status=\"failed\"} - (cinechain_refund_total{tenant=~\"$tenant\",status=\"failed\"} offset $__range or cinechain_refund_total{tenant=~\"$tenant\",status=\"failed\"} * 0)) and resets(cinechain_refund_total{tenant=~\"$tenant\",status=\"failed\"}[$__range]) == 0 or increase(cinechain_refund_total{tenant=~\"$tenant\",status=\"failed\"}[$__range]) and resets(cinechain_refund_total{tenant=~\"$tenant\",status=\"failed\"}[$__range]) > 0)) or vector(0))) or vector(0)",
+     "instant": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "0",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 1
+       }
+      ]
+     },
+     "mappings": [],
+     "color": {
+      "mode": "thresholds"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "colorMode": "background",
+    "graphMode": "none",
+    "textMode": "value",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "gridPos": {
+    "x": 16,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   }
+  },
+  {
+   "id": 6,
+   "type": "stat",
+   "title": "Webhook signature failures",
+   "description": "Forged, stale or misconfigured provider callbacks.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "((sum(((cinechain_payment_webhook_total{result=\"invalid_signature\"} - (cinechain_payment_webhook_total{result=\"invalid_signature\"} offset $__range or cinechain_payment_webhook_total{result=\"invalid_signature\"} * 0)) and resets(cinechain_payment_webhook_total{result=\"invalid_signature\"}[$__range]) == 0 or increase(cinechain_payment_webhook_total{result=\"invalid_signature\"}[$__range]) and resets(cinechain_payment_webhook_total{result=\"invalid_signature\"}[$__range]) > 0)) or vector(0))) or vector(0)",
+     "instant": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "0",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 1
+       },
+       {
+        "color": "red",
+        "value": 10
+       }
+      ]
+     },
+     "mappings": [],
+     "color": {
+      "mode": "thresholds"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "colorMode": "background",
+    "graphMode": "none",
+    "textMode": "value",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "gridPos": {
+    "x": 20,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   }
+  },
+  {
+   "id": 7,
+   "type": "row",
+   "title": "Captures",
+   "collapsed": false,
+   "panels": [],
+   "gridPos": {
+    "x": 0,
+    "y": 4,
+    "w": 24,
+    "h": 1
+   }
+  },
+  {
+   "id": 8,
+   "type": "timeseries",
+   "title": "Captures / min by provider and outcome",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "60 * sum by (provider, outcome) (rate(cinechain_payment_capture_total[5m]))",
+     "legendFormat": "{{provider}} · {{outcome}}"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "No data available",
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 60,
+      "lineWidth": 2,
+      "showPoints": "never",
+      "spanNulls": true,
+      "stacking": {
+       "mode": "normal",
+       "group": "A"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "color": {
+      "mode": "palette-classic"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 5,
+    "w": 12,
+    "h": 8
+   }
+  },
+  {
+   "id": 9,
+   "type": "timeseries",
+   "title": "Provider capture latency",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "histogram_quantile(0.5, sum by (le, provider) (rate(cinechain_payment_capture_seconds_bucket[5m])))",
+     "legendFormat": "p50 {{provider}}"
+    },
+    {
+     "refId": "B",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "histogram_quantile(0.95, sum by (le, provider) (rate(cinechain_payment_capture_seconds_bucket[5m])))",
+     "legendFormat": "p95 {{provider}}"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s",
+     "noValue": "No data available",
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 12,
+      "lineWidth": 2,
+      "showPoints": "never",
+      "spanNulls": true,
+      "stacking": {
+       "mode": "none",
+       "group": "A"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "color": {
+      "mode": "palette-classic"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 5,
+    "w": 12,
+    "h": 8
+   }
+  },
+  {
+   "id": 10,
+   "type": "timeseries",
+   "title": "Webhooks / min by result",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "60 * sum by (provider, result) (rate(cinechain_payment_webhook_total[5m]))",
+     "legendFormat": "{{provider}} · {{result}}"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "No data available",
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 60,
+      "lineWidth": 2,
+      "showPoints": "never",
+      "spanNulls": true,
+      "stacking": {
+       "mode": "normal",
+       "group": "A"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "color": {
+      "mode": "palette-classic"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 13,
+    "w": 12,
+    "h": 8
+   }
+  },
+  {
+   "id": 11,
+   "type": "piechart",
+   "title": "Capture outcomes",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (outcome) (((cinechain_payment_capture_total - (cinechain_payment_capture_total offset $__range or cinechain_payment_capture_total * 0)) and resets(cinechain_payment_capture_total[$__range]) == 0 or increase(cinechain_payment_capture_total[$__range]) and resets(cinechain_payment_capture_total[$__range]) > 0))",
+     "instant": true,
+     "legendFormat": "{{outcome}}"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "No data available",
+     "color": {
+      "mode": "palette-classic"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "pieType": "donut",
+    "legend": {
+     "displayMode": "table",
+     "placement": "right",
+     "values": [
+      "value",
+      "percent"
+     ]
+    },
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "tooltip": {
+     "mode": "single"
+    }
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 13,
+    "w": 6,
+    "h": 8
+   }
+  },
+  {
+   "id": 12,
+   "type": "piechart",
+   "title": "Webhook results",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (result) (((cinechain_payment_webhook_total - (cinechain_payment_webhook_total offset $__range or cinechain_payment_webhook_total * 0)) and resets(cinechain_payment_webhook_total[$__range]) == 0 or increase(cinechain_payment_webhook_total[$__range]) and resets(cinechain_payment_webhook_total[$__range]) > 0))",
+     "instant": true,
+     "legendFormat": "{{result}}"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "No data available",
+     "color": {
+      "mode": "palette-classic"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "pieType": "donut",
+    "legend": {
+     "displayMode": "table",
+     "placement": "right",
+     "values": [
+      "value",
+      "percent"
+     ]
+    },
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "tooltip": {
+     "mode": "single"
+    }
+   },
+   "gridPos": {
+    "x": 18,
+    "y": 13,
+    "w": 6,
+    "h": 8
+   }
+  },
+  {
+   "id": 13,
+   "type": "row",
+   "title": "Refunds & reconciliation",
+   "collapsed": false,
+   "panels": [],
+   "gridPos": {
+    "x": 0,
+    "y": 21,
+    "w": 24,
+    "h": 1
+   }
+  },
+  {
+   "id": 14,
+   "type": "timeseries",
+   "title": "Refunds / hour by reason",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "3600 * sum by (reason) (rate(cinechain_refund_total{tenant=~\"$tenant\"}[5m]))",
+     "legendFormat": "{{reason}}"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "No data available",
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "custom": {
+      "drawStyle": "bars",
+      "fillOpacity": 60,
+      "lineWidth": 2,
+      "showPoints": "never",
+      "spanNulls": true,
+      "stacking": {
+       "mode": "none",
+       "group": "A"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "color": {
+      "mode": "palette-classic"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 22,
+    "w": 12,
+    "h": 8
+   }
+  },
+  {
+   "id": 15,
+   "type": "timeseries",
+   "title": "Refunded amount / hour (minor units)",
+   "description": "Money is integer MINOR units in the stated currency (e.g. KES cents): the platform never stores floats.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "3600 * sum by (currency) (rate(cinechain_refund_amount_minor_total{tenant=~\"$tenant\"}[5m]))",
+     "legendFormat": "{{currency}}"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "No data available",
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 12,
+      "lineWidth": 2,
+      "showPoints": "never",
+      "spanNulls": true,
+      "stacking": {
+       "mode": "none",
+       "group": "A"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "color": {
+      "mode": "palette-classic"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 22,
+    "w": 12,
+    "h": 8
+   }
+  },
+  {
+   "id": 16,
+   "type": "bargauge",
+   "title": "Refunds by reason and status",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (reason, status) (((cinechain_refund_total{tenant=~\"$tenant\"} - (cinechain_refund_total{tenant=~\"$tenant\"} offset $__range or cinechain_refund_total{tenant=~\"$tenant\"} * 0)) and resets(cinechain_refund_total{tenant=~\"$tenant\"}[$__range]) == 0 or increase(cinechain_refund_total{tenant=~\"$tenant\"}[$__range]) and resets(cinechain_refund_total{tenant=~\"$tenant\"}[$__range]) > 0))",
+     "instant": true,
+     "legendFormat": "{{reason}} · {{status}}"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "No data available",
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "blue",
+        "value": null
+       }
+      ]
+     },
+     "color": {
+      "mode": "continuous-BlPu"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "orientation": "horizontal",
+    "displayMode": "gradient",
+    "showUnfilled": true,
+    "valueMode": "color",
+    "namePlacement": "left",
+    "sizing": "auto",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 30,
+    "w": 8,
+    "h": 8
+   }
+  },
+  {
+   "id": 17,
+   "type": "bargauge",
+   "title": "Reconciler actions by chain",
+   "description": "orphan_refunded: paid but never confirmed → refunded. refund_retried: a pending refund asked again.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "(sum by (tenant, action) (((cinechain_reconciliation_actions_total{tenant=~\"$tenant\"} - (cinechain_reconciliation_actions_total{tenant=~\"$tenant\"} offset $__range or cinechain_reconciliation_actions_total{tenant=~\"$tenant\"} * 0)) and resets(cinechain_reconciliation_actions_total{tenant=~\"$tenant\"}[$__range]) == 0 or increase(cinechain_reconciliation_actions_total{tenant=~\"$tenant\"}[$__range]) and resets(cinechain_reconciliation_actions_total{tenant=~\"$tenant\"}[$__range]) > 0))) * on (tenant) group_left (slug) max by (tenant, slug) (cinechain_tenant_info) or on (tenant) label_replace(sum by (tenant, action) (((cinechain_reconciliation_actions_total{tenant=~\"$tenant\"} - (cinechain_reconciliation_actions_total{tenant=~\"$tenant\"} offset $__range or cinechain_reconciliation_actions_total{tenant=~\"$tenant\"} * 0)) and resets(cinechain_reconciliation_actions_total{tenant=~\"$tenant\"}[$__range]) == 0 or increase(cinechain_reconciliation_actions_total{tenant=~\"$tenant\"}[$__range]) and resets(cinechain_reconciliation_actions_total{tenant=~\"$tenant\"}[$__range]) > 0)), \"slug\", \"$1\", \"tenant\", \"(.*)\")",
+     "instant": true,
+     "legendFormat": "{{slug}} · {{action}}"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "No data available",
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "blue",
+        "value": null
+       }
+      ]
+     },
+     "color": {
+      "mode": "continuous-BlPu"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "orientation": "horizontal",
+    "displayMode": "gradient",
+    "showUnfilled": true,
+    "valueMode": "color",
+    "namePlacement": "left",
+    "sizing": "auto",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "gridPos": {
+    "x": 8,
+    "y": 30,
+    "w": 8,
+    "h": 8
+   }
+  },
+  {
+   "id": 18,
+   "type": "stat",
+   "title": "Reconciler runs",
+   "description": "One run per chain, every few minutes.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "((sum(((cinechain_reconciliation_runs_total{tenant=~\"$tenant\"} - (cinechain_reconciliation_runs_total{tenant=~\"$tenant\"} offset $__range or cinechain_reconciliation_runs_total{tenant=~\"$tenant\"} * 0)) and resets(cinechain_reconciliation_runs_total{tenant=~\"$tenant\"}[$__range]) == 0 or increase(cinechain_reconciliation_runs_total{tenant=~\"$tenant\"}[$__range]) and resets(cinechain_reconciliation_runs_total{tenant=~\"$tenant\"}[$__range]) > 0)) or vector(0))) or vector(0)",
+     "instant": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "0",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "mappings": [],
+     "color": {
+      "mode": "thresholds"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "value",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "gridPos": {
+    "x": 16,
+    "y": 30,
+    "w": 8,
+    "h": 8
+   }
+  }
+ ]
+}

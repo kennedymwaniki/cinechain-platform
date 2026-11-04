@@ -80,7 +80,8 @@ describe('schema guard', () => {
   });
 
   it('no RLS exemption exists beyond the reviewed list', async () => {
-    expect([...RLS_EXEMPT_TABLES].sort()).toEqual(['drizzle_migrations', 'tenant']);
+    // `tier` (step 25) is global product configuration with no tenant data. A fifth entry is a review.
+    expect([...RLS_EXEMPT_TABLES].sort()).toEqual(['drizzle_migrations', 'tenant', 'tier']);
   });
 
   it('the application role owns nothing and has no privileges on platform.*', async () => {

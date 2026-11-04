@@ -40,7 +40,7 @@ Tenant context must come from a source the caller cannot forge. Never accept a c
 ## Non-negotiables
 
 1. Every tenant-scoped table: `tenant_id NOT NULL`, RLS `ENABLE`d **and** `FORCE`d, policy with
-   `USING` **and** `WITH CHECK`. Exempt: `tenant`, `platform.*`, `drizzle_migrations` — that list
+   `USING` **and** `WITH CHECK`. Exempt: `tenant`, `tier`, `platform.*`, `drizzle_migrations` — that list
    is complete, and extending it requires changing the schema-guard test.
 2. The app connects as `cinechain_app` — **not** the table owner, **`NOBYPASSRLS`**. An app that
    owns its tables silently voids every policy while all the tests still pass.
@@ -97,6 +97,15 @@ From operations (steps 22–24):
   Name counters `*_total` (prom-client does not add it).
 - **Metering never reads tenant tables.** The aggregator runs in the control plane, whose role has
   no grant on booking/ticket/payment. Exactly two `@CrossTenantJob`s exist; that is final.
+- **Tiers are rows** (`tier` table); limits come from `TierConfig`. Never write a tier name in
+  `src/` outside `src/tiering/` (the `cinechain/no-tier-branching` lint rule). Public routes declare
+  their tenant source with `@RateLimitTenantFrom(...)`; health, scrapes and webhooks `@SkipRateLimit()`.
+- **Billing is control-plane only** (`platform.*`). Money is bigint minor units; invoice lines carry
+  their own arithmetic and the database checks it. Subscription payments never use the ticket path.
+- **Tenant data is only ever touched by `cinechain_app`, inside the tenant's scope** — including
+  offboarding: export and deletion run in the application plane (`src/lifecycle/`); the control
+  plane orchestrates and verifies. A new tenant table must be placed in `DELETION_ORDER`.
+- **Suspended ≠ closed for customers who paid:** box-office staff keep `@AllowWhenSuspended` routes.
 - **Two Docker engines exist on this machine** (`docker context ls`: `default` and Docker
   Desktop). The dev data lives on `default`. If Postgres looks empty, check the context first.
 
@@ -129,8 +138,14 @@ operator `purity@cinechain.test`. Node is the installed v25; NestJS 12.
 Observability (optional profile): `docker compose --profile observability up -d` adds
 Prometheus (127.0.0.1:9090, scrapes both planes, loads `deploy/alerts/`), Loki (127.0.0.1:3100),
 Alloy (ships `logs/*.log`, from `LOG_FILE`/`LOG_FILE_CONTROL`) and Grafana on **127.0.0.1:3030**
-(`admin` / `cinechain-grafana`, dashboard "CineChain — overview"). Prometheus and Grafana use host
+(`admin` / `cinechain-grafana`, folder "CineChain": overview, bookings, holds, payments, admission,
+jobs, rate limits, security, API routes, runtime, platform/billing, logs). Prometheus and Grafana use host
 networking (native engine): the metrics endpoints answer loopback only.
+
+Dashboards are **generated**: edit `deploy/grafana/gen-dashboards.mjs`, run `pnpm grafana:dashboards`, commit the JSON (the overview
+is hand-kept). Stats show 0 when empty, graphs "No data available". "In range" counts use `delta()`
+(exact; `increase()` extrapolates money). Chain names come from the control plane's
+`cinechain_tenant_info` (id → slug). A new business event gets a counter at its source via `Metrics`.
 
 Postgres is on **5434** and Redis on **6380**. Native Postgres clusters already hold 5432 *and* 5433,
 and a native Redis holds 6379. MinIO (S3-compatible, posters and exports) is on **9000**, with its

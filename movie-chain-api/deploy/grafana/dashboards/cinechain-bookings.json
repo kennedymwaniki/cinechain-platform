@@ -1,0 +1,1205 @@
+{
+ "uid": "cinechain-bookings",
+ "title": "CineChain — Bookings & revenue",
+ "description": "Checkout funnel, confirmed sales, revenue and tickets issued, per chain.",
+ "tags": [
+  "cinechain",
+  "business"
+ ],
+ "timezone": "browser",
+ "schemaVersion": 41,
+ "version": 1,
+ "editable": true,
+ "graphTooltip": 1,
+ "refresh": "30s",
+ "time": {
+  "from": "now-6h",
+  "to": "now"
+ },
+ "links": [
+  {
+   "title": "CineChain",
+   "type": "dashboards",
+   "tags": [
+    "cinechain"
+   ],
+   "asDropdown": true,
+   "includeVars": false,
+   "keepTime": true
+  }
+ ],
+ "templating": {
+  "list": [
+   {
+    "name": "tenant",
+    "label": "chain",
+    "type": "query",
+    "datasource": {
+     "type": "prometheus",
+     "uid": "prometheus"
+    },
+    "definition": "query_result(max by (slug, tenant) (cinechain_tenant_info{status!=\"deleted\"}))",
+    "query": {
+     "query": "query_result(max by (slug, tenant) (cinechain_tenant_info{status!=\"deleted\"}))",
+     "refId": "tenant"
+    },
+    "regex": "/slug=\"(?<text>[^\"]+)\".*tenant=\"(?<value>[^\"]+)\"/",
+    "includeAll": true,
+    "multi": true,
+    "allValue": ".*",
+    "current": {
+     "text": "All",
+     "value": "$__all"
+    },
+    "refresh": 2,
+    "sort": 1
+   }
+  ]
+ },
+ "annotations": {
+  "list": []
+ },
+ "panels": [
+  {
+   "id": 1,
+   "type": "stat",
+   "title": "Bookings confirmed",
+   "description": "Sales committed in the selected range (online + box office).",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "((sum(((cinechain_booking_confirmed_total{tenant=~\"$tenant\"} - (cinechain_booking_confirmed_total{tenant=~\"$tenant\"} offset $__range or cinechain_booking_confirmed_total{tenant=~\"$tenant\"} * 0)) and resets(cinechain_booking_confirmed_total{tenant=~\"$tenant\"}[$__range]) == 0 or increase(cinechain_booking_confirmed_total{tenant=~\"$tenant\"}[$__range]) and resets(cinechain_booking_confirmed_total{tenant=~\"$tenant\"}[$__range]) > 0)) or vector(0))) or vector(0)",
+     "instant": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "0",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "mappings": [],
+     "color": {
+      "mode": "thresholds"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "value",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   }
+  },
+  {
+   "id": 2,
+   "type": "stat",
+   "title": "Tickets issued",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "((sum(((cinechain_booking_tickets_issued_total{tenant=~\"$tenant\"} - (cinechain_booking_tickets_issued_total{tenant=~\"$tenant\"} offset $__range or cinechain_booking_tickets_issued_total{tenant=~\"$tenant\"} * 0)) and resets(cinechain_booking_tickets_issued_total{tenant=~\"$tenant\"}[$__range]) == 0 or increase(cinechain_booking_tickets_issued_total{tenant=~\"$tenant\"}[$__range]) and resets(cinechain_booking_tickets_issued_total{tenant=~\"$tenant\"}[$__range]) > 0)) or vector(0))) or vector(0)",
+     "instant": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "0",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "mappings": [],
+     "color": {
+      "mode": "thresholds"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "value",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "gridPos": {
+    "x": 4,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   }
+  },
+  {
+   "id": 3,
+   "type": "stat",
+   "title": "Revenue (minor units)",
+   "description": "Money is integer MINOR units in the stated currency (e.g. KES cents): the platform never stores floats.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "((sum(((cinechain_booking_revenue_minor_total{tenant=~\"$tenant\"} - (cinechain_booking_revenue_minor_total{tenant=~\"$tenant\"} offset $__range or cinechain_booking_revenue_minor_total{tenant=~\"$tenant\"} * 0)) and resets(cinechain_booking_revenue_minor_total{tenant=~\"$tenant\"}[$__range]) == 0 or increase(cinechain_booking_revenue_minor_total{tenant=~\"$tenant\"}[$__range]) and resets(cinechain_booking_revenue_minor_total{tenant=~\"$tenant\"}[$__range]) > 0)) or vector(0))) or vector(0)",
+     "instant": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "decimals": 0,
+     "noValue": "0",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "mappings": [],
+     "color": {
+      "mode": "thresholds"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "value",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "gridPos": {
+    "x": 8,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   }
+  },
+  {
+   "id": 4,
+   "type": "stat",
+   "title": "Checkout success rate",
+   "description": "Confirmed ÷ checkout attempts (idempotent replays excluded).",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "((((sum(((cinechain_booking_checkout_total{tenant=~\"$tenant\",outcome=\"confirmed\"} - (cinechain_booking_checkout_total{tenant=~\"$tenant\",outcome=\"confirmed\"} offset $__range or cinechain_booking_checkout_total{tenant=~\"$tenant\",outcome=\"confirmed\"} * 0)) and resets(cinechain_booking_checkout_total{tenant=~\"$tenant\",outcome=\"confirmed\"}[$__range]) == 0 or increase(cinechain_booking_checkout_total{tenant=~\"$tenant\",outcome=\"confirmed\"}[$__range]) and resets(cinechain_booking_checkout_total{tenant=~\"$tenant\",outcome=\"confirmed\"}[$__range]) > 0)) or vector(0))) / clamp_min((sum(((cinechain_booking_checkout_total{tenant=~\"$tenant\",outcome!=\"replayed\"} - (cinechain_booking_checkout_total{tenant=~\"$tenant\",outcome!=\"replayed\"} offset $__range or cinechain_booking_checkout_total{tenant=~\"$tenant\",outcome!=\"replayed\"} * 0)) and resets(cinechain_booking_checkout_total{tenant=~\"$tenant\",outcome!=\"replayed\"}[$__range]) == 0 or increase(cinechain_booking_checkout_total{tenant=~\"$tenant\",outcome!=\"replayed\"}[$__range]) and resets(cinechain_booking_checkout_total{tenant=~\"$tenant\",outcome!=\"replayed\"}[$__range]) > 0)) or vector(0)), 1e-9)) or vector(0)) or vector(0)",
+     "instant": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percentunit",
+     "decimals": 1,
+     "noValue": "0",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "mappings": [],
+     "color": {
+      "mode": "thresholds"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "value",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   }
+  },
+  {
+   "id": 5,
+   "type": "stat",
+   "title": "Checkout p95",
+   "description": "Includes the payment provider call.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "(histogram_quantile(0.95, sum by (le) (rate(cinechain_booking_checkout_seconds_bucket{tenant=~\"$tenant\"}[5m])))) or vector(0)",
+     "instant": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s",
+     "decimals": 2,
+     "noValue": "0",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 2
+       },
+       {
+        "color": "red",
+        "value": 5
+       }
+      ]
+     },
+     "mappings": [],
+     "color": {
+      "mode": "thresholds"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "colorMode": "background",
+    "graphMode": "none",
+    "textMode": "value",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "gridPos": {
+    "x": 16,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   }
+  },
+  {
+   "id": 6,
+   "type": "stat",
+   "title": "Seats lost after capture",
+   "description": "Paid but the seats were gone: refunded automatically (FR-53). Should be rare.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "((sum(((cinechain_booking_seats_lost_after_capture_total{tenant=~\"$tenant\"} - (cinechain_booking_seats_lost_after_capture_total{tenant=~\"$tenant\"} offset $__range or cinechain_booking_seats_lost_after_capture_total{tenant=~\"$tenant\"} * 0)) and resets(cinechain_booking_seats_lost_after_capture_total{tenant=~\"$tenant\"}[$__range]) == 0 or increase(cinechain_booking_seats_lost_after_capture_total{tenant=~\"$tenant\"}[$__range]) and resets(cinechain_booking_seats_lost_after_capture_total{tenant=~\"$tenant\"}[$__range]) > 0)) or vector(0))) or vector(0)",
+     "instant": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "0",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 1
+       }
+      ]
+     },
+     "mappings": [],
+     "color": {
+      "mode": "thresholds"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "colorMode": "background",
+    "graphMode": "none",
+    "textMode": "value",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "gridPos": {
+    "x": 20,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   }
+  },
+  {
+   "id": 7,
+   "type": "row",
+   "title": "Volume",
+   "collapsed": false,
+   "panels": [],
+   "gridPos": {
+    "x": 0,
+    "y": 4,
+    "w": 24,
+    "h": 1
+   }
+  },
+  {
+   "id": 8,
+   "type": "timeseries",
+   "title": "Confirmed bookings / min by chain",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "(60 * sum by (tenant) (rate(cinechain_booking_confirmed_total{tenant=~\"$tenant\"}[5m]))) * on (tenant) group_left (slug) max by (tenant, slug) (cinechain_tenant_info) or on (tenant) label_replace(60 * sum by (tenant) (rate(cinechain_booking_confirmed_total{tenant=~\"$tenant\"}[5m])), \"slug\", \"$1\", \"tenant\", \"(.*)\")",
+     "legendFormat": "{{slug}}"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "No data available",
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 60,
+      "lineWidth": 2,
+      "showPoints": "never",
+      "spanNulls": true,
+      "stacking": {
+       "mode": "normal",
+       "group": "A"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "color": {
+      "mode": "palette-classic"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 5,
+    "w": 12,
+    "h": 8
+   }
+  },
+  {
+   "id": 9,
+   "type": "timeseries",
+   "title": "Tickets issued / min by chain",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "(60 * sum by (tenant) (rate(cinechain_booking_tickets_issued_total{tenant=~\"$tenant\"}[5m]))) * on (tenant) group_left (slug) max by (tenant, slug) (cinechain_tenant_info) or on (tenant) label_replace(60 * sum by (tenant) (rate(cinechain_booking_tickets_issued_total{tenant=~\"$tenant\"}[5m])), \"slug\", \"$1\", \"tenant\", \"(.*)\")",
+     "legendFormat": "{{slug}}"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "No data available",
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 60,
+      "lineWidth": 2,
+      "showPoints": "never",
+      "spanNulls": true,
+      "stacking": {
+       "mode": "normal",
+       "group": "A"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "color": {
+      "mode": "palette-classic"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 5,
+    "w": 12,
+    "h": 8
+   }
+  },
+  {
+   "id": 10,
+   "type": "timeseries",
+   "title": "Revenue / hour by currency (minor units)",
+   "description": "Money is integer MINOR units in the stated currency (e.g. KES cents): the platform never stores floats.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "3600 * sum by (currency) (rate(cinechain_booking_revenue_minor_total{tenant=~\"$tenant\"}[5m]))",
+     "legendFormat": "{{currency}}"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "No data available",
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 12,
+      "lineWidth": 2,
+      "showPoints": "never",
+      "spanNulls": true,
+      "stacking": {
+       "mode": "none",
+       "group": "A"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "color": {
+      "mode": "palette-classic"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 13,
+    "w": 12,
+    "h": 8
+   }
+  },
+  {
+   "id": 11,
+   "type": "timeseries",
+   "title": "Bookings by channel / min",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "60 * sum by (channel) (rate(cinechain_booking_confirmed_total{tenant=~\"$tenant\"}[5m]))",
+     "legendFormat": "{{channel}}"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "No data available",
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 60,
+      "lineWidth": 2,
+      "showPoints": "never",
+      "spanNulls": true,
+      "stacking": {
+       "mode": "normal",
+       "group": "A"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "color": {
+      "mode": "palette-classic"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 13,
+    "w": 12,
+    "h": 8
+   }
+  },
+  {
+   "id": 12,
+   "type": "row",
+   "title": "Checkout",
+   "collapsed": false,
+   "panels": [],
+   "gridPos": {
+    "x": 0,
+    "y": 21,
+    "w": 24,
+    "h": 1
+   }
+  },
+  {
+   "id": 13,
+   "type": "piechart",
+   "title": "Checkout outcomes",
+   "description": "confirmed, pending (awaiting the provider), replayed, or the refusal code.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (outcome) (((cinechain_booking_checkout_total{tenant=~\"$tenant\"} - (cinechain_booking_checkout_total{tenant=~\"$tenant\"} offset $__range or cinechain_booking_checkout_total{tenant=~\"$tenant\"} * 0)) and resets(cinechain_booking_checkout_total{tenant=~\"$tenant\"}[$__range]) == 0 or increase(cinechain_booking_checkout_total{tenant=~\"$tenant\"}[$__range]) and resets(cinechain_booking_checkout_total{tenant=~\"$tenant\"}[$__range]) > 0))",
+     "instant": true,
+     "legendFormat": "{{outcome}}"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "No data available",
+     "color": {
+      "mode": "palette-classic"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "pieType": "donut",
+    "legend": {
+     "displayMode": "table",
+     "placement": "right",
+     "values": [
+      "value",
+      "percent"
+     ]
+    },
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "tooltip": {
+     "mode": "single"
+    }
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 22,
+    "w": 8,
+    "h": 8
+   }
+  },
+  {
+   "id": 14,
+   "type": "piechart",
+   "title": "Payment methods used",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (method) (((cinechain_booking_checkout_total{tenant=~\"$tenant\",outcome=\"confirmed\"} - (cinechain_booking_checkout_total{tenant=~\"$tenant\",outcome=\"confirmed\"} offset $__range or cinechain_booking_checkout_total{tenant=~\"$tenant\",outcome=\"confirmed\"} * 0)) and resets(cinechain_booking_checkout_total{tenant=~\"$tenant\",outcome=\"confirmed\"}[$__range]) == 0 or increase(cinechain_booking_checkout_total{tenant=~\"$tenant\",outcome=\"confirmed\"}[$__range]) and resets(cinechain_booking_checkout_total{tenant=~\"$tenant\",outcome=\"confirmed\"}[$__range]) > 0))",
+     "instant": true,
+     "legendFormat": "{{method}}"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "No data available",
+     "color": {
+      "mode": "palette-classic"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "pieType": "donut",
+    "legend": {
+     "displayMode": "table",
+     "placement": "right",
+     "values": [
+      "value",
+      "percent"
+     ]
+    },
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "tooltip": {
+     "mode": "single"
+    }
+   },
+   "gridPos": {
+    "x": 8,
+    "y": 22,
+    "w": 8,
+    "h": 8
+   }
+  },
+  {
+   "id": 15,
+   "type": "bargauge",
+   "title": "Revenue by chain (minor units)",
+   "description": "Money is integer MINOR units in the stated currency (e.g. KES cents): the platform never stores floats.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "(sum by (tenant, currency) (((cinechain_booking_revenue_minor_total{tenant=~\"$tenant\"} - (cinechain_booking_revenue_minor_total{tenant=~\"$tenant\"} offset $__range or cinechain_booking_revenue_minor_total{tenant=~\"$tenant\"} * 0)) and resets(cinechain_booking_revenue_minor_total{tenant=~\"$tenant\"}[$__range]) == 0 or increase(cinechain_booking_revenue_minor_total{tenant=~\"$tenant\"}[$__range]) and resets(cinechain_booking_revenue_minor_total{tenant=~\"$tenant\"}[$__range]) > 0))) * on (tenant) group_left (slug) max by (tenant, slug) (cinechain_tenant_info) or on (tenant) label_replace(sum by (tenant, currency) (((cinechain_booking_revenue_minor_total{tenant=~\"$tenant\"} - (cinechain_booking_revenue_minor_total{tenant=~\"$tenant\"} offset $__range or cinechain_booking_revenue_minor_total{tenant=~\"$tenant\"} * 0)) and resets(cinechain_booking_revenue_minor_total{tenant=~\"$tenant\"}[$__range]) == 0 or increase(cinechain_booking_revenue_minor_total{tenant=~\"$tenant\"}[$__range]) and resets(cinechain_booking_revenue_minor_total{tenant=~\"$tenant\"}[$__range]) > 0)), \"slug\", \"$1\", \"tenant\", \"(.*)\")",
+     "instant": true,
+     "legendFormat": "{{slug}} · {{currency}}"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "No data available",
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "blue",
+        "value": null
+       }
+      ]
+     },
+     "color": {
+      "mode": "continuous-BlPu"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "orientation": "horizontal",
+    "displayMode": "gradient",
+    "showUnfilled": true,
+    "valueMode": "color",
+    "namePlacement": "left",
+    "sizing": "auto",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "gridPos": {
+    "x": 16,
+    "y": 22,
+    "w": 8,
+    "h": 8
+   }
+  },
+  {
+   "id": 16,
+   "type": "timeseries",
+   "title": "Checkout latency",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "histogram_quantile(0.5, sum by (le) (rate(cinechain_booking_checkout_seconds_bucket{tenant=~\"$tenant\"}[5m])))",
+     "legendFormat": "p50"
+    },
+    {
+     "refId": "B",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "histogram_quantile(0.95, sum by (le) (rate(cinechain_booking_checkout_seconds_bucket{tenant=~\"$tenant\"}[5m])))",
+     "legendFormat": "p95"
+    },
+    {
+     "refId": "C",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "histogram_quantile(0.99, sum by (le) (rate(cinechain_booking_checkout_seconds_bucket{tenant=~\"$tenant\"}[5m])))",
+     "legendFormat": "p99"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s",
+     "noValue": "No data available",
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 12,
+      "lineWidth": 2,
+      "showPoints": "never",
+      "spanNulls": true,
+      "stacking": {
+       "mode": "none",
+       "group": "A"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "color": {
+      "mode": "palette-classic"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 30,
+    "w": 12,
+    "h": 8
+   }
+  },
+  {
+   "id": 17,
+   "type": "timeseries",
+   "title": "Checkout refusals / min by reason",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "60 * sum by (outcome) (rate(cinechain_booking_checkout_total{tenant=~\"$tenant\",outcome!~\"confirmed|pending|replayed\"}[5m]))",
+     "legendFormat": "{{outcome}}"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "No data available",
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "custom": {
+      "drawStyle": "bars",
+      "fillOpacity": 60,
+      "lineWidth": 2,
+      "showPoints": "never",
+      "spanNulls": true,
+      "stacking": {
+       "mode": "none",
+       "group": "A"
+      },
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "color": {
+      "mode": "palette-classic"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 30,
+    "w": 12,
+    "h": 8
+   }
+  },
+  {
+   "id": 18,
+   "type": "table",
+   "title": "Per chain (selected range)",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "(sum by (tenant) (((cinechain_booking_confirmed_total{tenant=~\"$tenant\"} - (cinechain_booking_confirmed_total{tenant=~\"$tenant\"} offset $__range or cinechain_booking_confirmed_total{tenant=~\"$tenant\"} * 0)) and resets(cinechain_booking_confirmed_total{tenant=~\"$tenant\"}[$__range]) == 0 or increase(cinechain_booking_confirmed_total{tenant=~\"$tenant\"}[$__range]) and resets(cinechain_booking_confirmed_total{tenant=~\"$tenant\"}[$__range]) > 0))) * on (tenant) group_left (slug) max by (tenant, slug) (cinechain_tenant_info) or on (tenant) label_replace(sum by (tenant) (((cinechain_booking_confirmed_total{tenant=~\"$tenant\"} - (cinechain_booking_confirmed_total{tenant=~\"$tenant\"} offset $__range or cinechain_booking_confirmed_total{tenant=~\"$tenant\"} * 0)) and resets(cinechain_booking_confirmed_total{tenant=~\"$tenant\"}[$__range]) == 0 or increase(cinechain_booking_confirmed_total{tenant=~\"$tenant\"}[$__range]) and resets(cinechain_booking_confirmed_total{tenant=~\"$tenant\"}[$__range]) > 0)), \"slug\", \"$1\", \"tenant\", \"(.*)\")",
+     "instant": true,
+     "format": "table"
+    },
+    {
+     "refId": "B",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "(sum by (tenant) (((cinechain_booking_tickets_issued_total{tenant=~\"$tenant\"} - (cinechain_booking_tickets_issued_total{tenant=~\"$tenant\"} offset $__range or cinechain_booking_tickets_issued_total{tenant=~\"$tenant\"} * 0)) and resets(cinechain_booking_tickets_issued_total{tenant=~\"$tenant\"}[$__range]) == 0 or increase(cinechain_booking_tickets_issued_total{tenant=~\"$tenant\"}[$__range]) and resets(cinechain_booking_tickets_issued_total{tenant=~\"$tenant\"}[$__range]) > 0))) * on (tenant) group_left (slug) max by (tenant, slug) (cinechain_tenant_info) or on (tenant) label_replace(sum by (tenant) (((cinechain_booking_tickets_issued_total{tenant=~\"$tenant\"} - (cinechain_booking_tickets_issued_total{tenant=~\"$tenant\"} offset $__range or cinechain_booking_tickets_issued_total{tenant=~\"$tenant\"} * 0)) and resets(cinechain_booking_tickets_issued_total{tenant=~\"$tenant\"}[$__range]) == 0 or increase(cinechain_booking_tickets_issued_total{tenant=~\"$tenant\"}[$__range]) and resets(cinechain_booking_tickets_issued_total{tenant=~\"$tenant\"}[$__range]) > 0)), \"slug\", \"$1\", \"tenant\", \"(.*)\")",
+     "instant": true,
+     "format": "table"
+    },
+    {
+     "refId": "C",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "(sum by (tenant) (((cinechain_booking_checkout_total{tenant=~\"$tenant\"} - (cinechain_booking_checkout_total{tenant=~\"$tenant\"} offset $__range or cinechain_booking_checkout_total{tenant=~\"$tenant\"} * 0)) and resets(cinechain_booking_checkout_total{tenant=~\"$tenant\"}[$__range]) == 0 or increase(cinechain_booking_checkout_total{tenant=~\"$tenant\"}[$__range]) and resets(cinechain_booking_checkout_total{tenant=~\"$tenant\"}[$__range]) > 0))) * on (tenant) group_left (slug) max by (tenant, slug) (cinechain_tenant_info) or on (tenant) label_replace(sum by (tenant) (((cinechain_booking_checkout_total{tenant=~\"$tenant\"} - (cinechain_booking_checkout_total{tenant=~\"$tenant\"} offset $__range or cinechain_booking_checkout_total{tenant=~\"$tenant\"} * 0)) and resets(cinechain_booking_checkout_total{tenant=~\"$tenant\"}[$__range]) == 0 or increase(cinechain_booking_checkout_total{tenant=~\"$tenant\"}[$__range]) and resets(cinechain_booking_checkout_total{tenant=~\"$tenant\"}[$__range]) > 0)), \"slug\", \"$1\", \"tenant\", \"(.*)\")",
+     "instant": true,
+     "format": "table"
+    },
+    {
+     "refId": "D",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "(sum by (tenant) (((cinechain_booking_seats_lost_after_capture_total{tenant=~\"$tenant\"} - (cinechain_booking_seats_lost_after_capture_total{tenant=~\"$tenant\"} offset $__range or cinechain_booking_seats_lost_after_capture_total{tenant=~\"$tenant\"} * 0)) and resets(cinechain_booking_seats_lost_after_capture_total{tenant=~\"$tenant\"}[$__range]) == 0 or increase(cinechain_booking_seats_lost_after_capture_total{tenant=~\"$tenant\"}[$__range]) and resets(cinechain_booking_seats_lost_after_capture_total{tenant=~\"$tenant\"}[$__range]) > 0))) * on (tenant) group_left (slug) max by (tenant, slug) (cinechain_tenant_info) or on (tenant) label_replace(sum by (tenant) (((cinechain_booking_seats_lost_after_capture_total{tenant=~\"$tenant\"} - (cinechain_booking_seats_lost_after_capture_total{tenant=~\"$tenant\"} offset $__range or cinechain_booking_seats_lost_after_capture_total{tenant=~\"$tenant\"} * 0)) and resets(cinechain_booking_seats_lost_after_capture_total{tenant=~\"$tenant\"}[$__range]) == 0 or increase(cinechain_booking_seats_lost_after_capture_total{tenant=~\"$tenant\"}[$__range]) and resets(cinechain_booking_seats_lost_after_capture_total{tenant=~\"$tenant\"}[$__range]) > 0)), \"slug\", \"$1\", \"tenant\", \"(.*)\")",
+     "instant": true,
+     "format": "table"
+    }
+   ],
+   "transformations": [
+    {
+     "id": "merge",
+     "options": {}
+    },
+    {
+     "id": "organize",
+     "options": {
+      "excludeByName": {
+       "Time": true,
+       "tenant": true
+      },
+      "renameByName": {
+       "Value #A": "Bookings",
+       "Value #B": "Tickets",
+       "Value #C": "Checkout attempts",
+       "Value #D": "Seats lost",
+       "slug": "Chain"
+      }
+     }
+    },
+    {
+     "id": "sortBy",
+     "options": {
+      "sort": [
+       {
+        "field": "Bookings",
+        "desc": true
+       }
+      ]
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "noValue": "No data available",
+     "custom": {
+      "align": "auto",
+      "cellOptions": {
+       "type": "auto"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "showHeader": true,
+    "cellHeight": "sm",
+    "footer": {
+     "show": false,
+     "reducer": [
+      "sum"
+     ],
+     "fields": ""
+    }
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 38,
+    "w": 24,
+    "h": 9
+   }
+  }
+ ]
+}

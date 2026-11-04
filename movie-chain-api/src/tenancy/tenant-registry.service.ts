@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { TenantDb, UUID_RE } from './tenant-db.provider';
 
-export type TenantStatus = 'pending' | 'provisioning' | 'active' | 'suspended' | 'offboarding';
+export type TenantStatus = 'pending' | 'provisioning' | 'active' | 'suspended' | 'offboarding' | 'deleted';
 
 export interface TenantRecord {
   id: string;
   slug: string;
   name: string;
-  tier: 'basic' | 'standard' | 'premium' | 'dedicated';
+  tier: string; // a tier CODE; limits come from TierConfig, never from comparing this
   status: TenantStatus;
   holdSeconds: number;
   maxSeatsPerBooking: number;

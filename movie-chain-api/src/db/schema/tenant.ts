@@ -1,14 +1,16 @@
-import { char, integer, pgEnum, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { boolean, char, integer, pgEnum, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 /** Mirrors 0001_registry.sql. The SQL migrations are the source of truth. */
-export const tenantTier = pgEnum('tenant_tier', ['basic', 'standard', 'premium', 'dedicated']);
-export const tenantStatus = pgEnum('tenant_status', ['pending', 'provisioning', 'active', 'suspended', 'offboarding']);
+export const tenantStatus = pgEnum('tenant_status', ['pending', 'provisioning', 'active', 'suspended', 'offboarding', 'deleted']);
 
 export const tenant = pgTable('tenant', {
   id: uuid('id').primaryKey().defaultRandom(),
   slug: text('slug').notNull().unique(),
   name: text('name').notNull(),
-  tier: tenantTier('tier').notNull().default('basic'),
+  /** A tier CODE (row in `tier`). Never compared to a literal outside src/tiering. */
+  tier: text('tier').notNull().default('basic'),
+  /** Negotiated override of the tier's rate limit; null = the tier's. */
+  rateLimitRps: integer('rate_limit_rps'),
   status: tenantStatus('status').notNull().default('pending'),
   country: char('country', { length: 2 }).notNull().default('KE'),
   dbRef: text('db_ref'),
@@ -28,3 +30,19 @@ export const tenant = pgTable('tenant', {
 });
 
 export type Tenant = typeof tenant.$inferSelect;
+
+/** Step 25. Mirrors 0022_tiers.sql: a tier is configuration, read at runtime. */
+export const tier = pgTable('tier', {
+  code: text('code').primaryKey(),
+  name: text('name').notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
+  sellable: boolean('sellable').notNull().default(true),
+  rateLimitRps: integer('rate_limit_rps').notNull(),
+  maxTheatres: integer('max_theatres').notNull(),
+  holdSecondsMin: integer('hold_seconds_min').notNull(),
+  holdSecondsMax: integer('hold_seconds_max').notNull(),
+  maxSeatsPerBooking: integer('max_seats_per_booking').notNull(),
+  dataRetentionDays: integer('data_retention_days').notNull(),
+});
+
+export type Tier = typeof tier.$inferSelect;

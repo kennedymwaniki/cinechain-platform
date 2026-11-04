@@ -10,5 +10,6 @@ export * from './screening';
 export * from './inventory';
 export * from './payment';
 export * from './booking';
+export * from './billing';
 export * from './admission';
 export * from './reporting';

@@ -26,6 +26,11 @@ export class VenueRepository {
     return onlyIds ? q.where(inArray(theatre.id, [...onlyIds])) : q;
   }
 
+  async countTheatres(): Promise<number> {
+    const [r] = await db().select({ n: sql<number>`count(*)::int` }).from(theatre);
+    return r!.n;
+  }
+
   async findTheatre(id: string) {
     const [row] = await db().select().from(theatre).where(eq(theatre.id, id));
     return row ?? null;

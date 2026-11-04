@@ -11,7 +11,7 @@ import { db } from '../../tenancy/tenant-context';
 export interface OnboardingRequest {
   name: string;
   slug: string;
-  tier: 'basic' | 'standard' | 'premium' | 'dedicated';
+  tier: string; // a tier CODE: the `tier` table's foreign key checks it
   country: string;
   contactEmail: string;
   contactName?: string | undefined;

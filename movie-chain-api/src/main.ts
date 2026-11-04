@@ -17,6 +17,8 @@ async function bootstrap(): Promise<void> {
   // Every line, from here on, is JSON with tenant_id and request_id from the tenancy context.
   app.useLogger(new PinoLogger({ level: cfg.logLevel, file: cfg.logFile.api }));
   app.setGlobalPrefix('api/v1');
+  // No client sends If-None-Match, and hashing every JSON body cost ~1.5 % CPU under load (step 25 profile).
+  app.getHttpAdapter().getInstance().set('etag', false);
   app.enableCors({ origin: cfg.corsOrigins, credentials: true });
   app.useWebSocketAdapter(new RedisIoAdapter(app, cfg.corsOrigins));
   app.enableShutdownHooks();

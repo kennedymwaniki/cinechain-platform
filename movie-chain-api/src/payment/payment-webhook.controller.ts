@@ -1,3 +1,4 @@
+import { SkipRateLimit } from '../tiering/decorators';
 import { Controller, HttpCode, Param, Post, type RawBodyRequest, Req } from '@nestjs/common';
 import { ApiExcludeEndpoint, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
@@ -13,6 +14,7 @@ export class PaymentWebhookController {
    * @Public (the provider has no token), yet tenant-scoped: the tenant comes
    * from the stored payment row, never from the request.
    */
+  @SkipRateLimit() // providers retry on their own schedule; their signature is the gate
   @Public()
   @ApiExcludeEndpoint()
   @HttpCode(200)

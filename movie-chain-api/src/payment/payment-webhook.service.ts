@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AuditLog } from '../audit/audit-log.service';
+import { Metrics } from '../observability/metrics.module';
 import { notFound, unauthorized } from '../common/errors/api-error';
 import { Doors } from '../tenancy/doors';
 import { toSystemContext } from '../tenancy/system-context';
@@ -28,6 +29,7 @@ export class PaymentWebhookService {
     private readonly tenantDb: TenantDb,
     private readonly repo: PaymentRepository,
     private readonly audit: AuditLog,
+    private readonly metrics: Metrics,
   ) {}
 
   /** Bookings (step 18) subscribe, to confirm or refund what a late callback settles. */
@@ -39,12 +41,16 @@ export class PaymentWebhookService {
     const provider = this.providers.get(providerName);
     if (!provider) throw notFound();
     const event = rawBody ? provider.verifyWebhook(rawBody, headers) : null;
-    if (!event) throw unauthorized('invalid_signature', 'Webhook signature is missing, invalid or stale');
+    if (!event) {
+      this.metrics.inc('payment.webhook_total', { provider: provider.name, result: 'invalid_signature' });
+      throw unauthorized('invalid_signature', 'Webhook signature is missing, invalid or stale');
+    }
 
     const owner = await this.doors.resolvePaymentTenant(provider.name, event.providerRef);
     if (!owner) {
       // Signed by the provider but not ours (or not yet stored): acknowledge, so it is not retried forever.
       this.log.warn(`${provider.name} webhook for unknown reference ${event.providerRef}`);
+      this.metrics.inc('payment.webhook_total', { provider: provider.name, result: 'unknown_reference' });
       return { received: true };
     }
 
@@ -61,6 +67,7 @@ export class PaymentWebhookService {
         return row ? { tenantId: owner.tenantId, paymentId: row.id, bookingId: row.bookingId, status: event.status } : null;
       }),
     );
+    this.metrics.inc('payment.webhook_total', { provider: provider.name, result: settled ? 'applied' : 'duplicate_or_no_change' });
     if (settled) for (const l of this.listeners) await l(settled);
     return { received: true };
   }

@@ -3,7 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { from, lastValueFrom, type Observable } from 'rxjs';
 import { SecurityEvents } from '../audit/security-event.service';
 import { forbidden, notFound, unauthorized } from '../common/errors/api-error';
-import { DEFER_TENANT_TX } from './decorators';
+import { admitsDoorStaff, ALLOW_WHEN_SUSPENDED, DEFER_TENANT_TX } from './decorators';
 import { runWithTenant, type TenantContext } from './tenant-context';
 import { TenantDb } from './tenant-db.provider';
 import { TenantRegistry } from './tenant-registry.service';
@@ -41,17 +41,18 @@ export class TenantInterceptor implements NestInterceptor {
     const defer = this.reflector.getAllAndOverride<boolean>(DEFER_TENANT_TX, [context.getHandler(), context.getClass()]);
     const run = () => lastValueFrom(next.handle(), { defaultValue: undefined });
     return from(
-      this.admit(req, ctx).then(() =>
+      this.admit(req, ctx, !!this.reflector.getAllAndOverride<boolean>(ALLOW_WHEN_SUSPENDED, [context.getHandler(), context.getClass()])).then(() =>
         runWithTenant(ctx, defer ? run : () => this.tenantDb.withTenantScope(run)),
       ),
     );
   }
 
   /** Checks that apply to every tenant-scoped request, before the handler runs. */
-  private async admit(req: TenantScopedRequest, ctx: TenantContext): Promise<void> {
+  private async admit(req: TenantScopedRequest, ctx: TenantContext, allowWhenSuspended: boolean): Promise<void> {
     const tenant = await this.registry.byId(ctx.tenantId);
     if (!tenant) throw unauthorized('no_tenant_context', 'Unknown tenant');
-    if (tenant.status !== 'active') {
+    const doorStaff = allowWhenSuspended && ctx.actor.kind === 'staff' && admitsDoorStaff(tenant.status, ctx.actor.role);
+    if (tenant.status !== 'active' && !doorStaff) {
       await this.security.record('suspended_tenant_access', { tenantId: tenant.id, path: req.path ?? null });
       throw forbidden('tenant_suspended', 'This cinema chain is not currently active');
     }
